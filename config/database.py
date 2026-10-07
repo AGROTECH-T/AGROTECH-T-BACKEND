@@ -35,6 +35,9 @@ def _mysql(engine: str) -> dict:
     @param engine: backend de Django ya normalizado.
     @returns dict de conexión MariaDB.
     """
+    options = {"charset": "utf8mb4"}
+    if os.getenv("DB_SSL", "").lower() in {"1", "true", "yes"}:
+        options["ssl"] = {}
     return {
         "ENGINE": engine,
         "NAME": os.getenv("DB_NAME", "agrotech_t"),
@@ -42,7 +45,7 @@ def _mysql(engine: str) -> dict:
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
         "HOST": os.getenv("DB_HOST", "localhost"),
         "PORT": os.getenv("DB_PORT", "3306"),
-        "OPTIONS": {"charset": "utf8mb4"},
+        "OPTIONS": options,
     }
 
 
