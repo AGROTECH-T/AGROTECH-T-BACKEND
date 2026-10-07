@@ -5,6 +5,7 @@
 
 from django.urls import path
 
+from apps.accounts.api.confirm_view import ConfirmCodeView
 from apps.accounts.api.views import (
     LoginView,
     LogoutView,
@@ -23,6 +24,7 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("auth/me/", MeView.as_view(), name="me"),
     path("auth/password/recovery/", RecoverView.as_view(), name="password-recovery"),
+    path("auth/password/confirm/", ConfirmCodeView.as_view(), name="password-confirm"),
     path("auth/password/reset/", ResetView.as_view(), name="password-reset"),
     path("auth/session/renew/", RenewView.as_view(), name="session-renew"),
 ]

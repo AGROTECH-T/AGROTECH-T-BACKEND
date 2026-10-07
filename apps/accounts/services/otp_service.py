@@ -4,6 +4,7 @@
 """
 import hashlib
 import hmac
+import math
 import os
 import re
 import secrets
@@ -13,24 +14,24 @@ from django.conf import settings
 from django.utils import timezone
 
 from apps.accounts.errors import AppError
-from apps.accounts.integrations import email, whatsapp
+from apps.accounts.integrations import email, sms, whatsapp
 from apps.accounts.models import LoginCode, User
+
+RESEND_WAIT = 10
 
 
 def request_code(user: User, channel: str) -> int:
-    """Entrega un OTP si no existe otro vigente."""
+    """Entrega un OTP y reemplaza el anterior después de diez segundos."""
     existing = LoginCode.objects.filter(user=user).first()
     now = timezone.now()
-    if existing and existing.expires_at > now:
-        wait = max(1, int((existing.expires_at - now).total_seconds()))
-        raise AppError("espera para enviar otro codigo", 429, wait=wait)
+    if existing:
+        elapsed = (now - existing.sent_at).total_seconds()
+        if elapsed < RESEND_WAIT:
+            wait = max(1, math.ceil(RESEND_WAIT - elapsed))
+            raise AppError(f"Podrás pedir otro código en {wait} segundos.", 429, wait=wait)
     digits = f"{secrets.randbelow(1_000_000):06d}"
-    if channel == "whatsapp":
-        whatsapp.send_code(user.phone)
-        stored = "twilio-verify"
-    else:
-        email.send_code(user.correo, digits)
-        stored = _digest(user.pk, digits)
+    _deliver(user, channel, digits)
+    stored = _digest(user.pk, digits)
     minutes = _otp_minutes()
     LoginCode.objects.update_or_create(
         user=user,
@@ -44,8 +45,19 @@ def request_code(user: User, channel: str) -> int:
     return minutes * 60
 
 
+def check_code(user: User, raw_code: str) -> None:
+    """Comprueba el OTP vigente sin gastarlo."""
+    _match(user, raw_code)
+
+
 def verify_code(user: User, raw_code: str) -> None:
     """Valida y consume un OTP vigente."""
+    _match(user, raw_code)
+    LoginCode.objects.filter(user=user).delete()
+
+
+def _match(user: User, raw_code: str) -> None:
+    """Acepta el código o suma un intento fallido."""
     match = re.search(r"\d{6}", raw_code)
     if not match:
         raise AppError("codigo invalido", 401)
@@ -56,16 +68,26 @@ def verify_code(user: User, raw_code: str) -> None:
         record.delete()
         raise AppError("el codigo vencio", 401)
     digits = match.group()
-    valid = (
-        whatsapp.check_code(user.phone, digits)
-        if record.channel == "whatsapp"
-        else hmac.compare_digest(record.code_hash, _digest(user.pk, digits))
+    expected = _digest(user.pk, digits)
+    valid = len(record.code_hash) == len(expected) and hmac.compare_digest(
+        record.code_hash, expected
     )
     if not valid:
         record.attempts += 1
         record.save(update_fields=["attempts"])
         raise AppError("codigo invalido", 401)
-    record.delete()
+
+
+def _deliver(user: User, channel: str, digits: str) -> None:
+    """Entrega el código por correo, WhatsApp o mensaje de texto."""
+    if channel == "correo":
+        email.send_code(user.correo, digits)
+    elif channel == "whatsapp":
+        whatsapp.send_code(user.phone, digits)
+    elif channel == "sms":
+        sms.send_code(user.phone, digits)
+    else:
+        raise AppError("no se pudo enviar el codigo")
 
 
 def _digest(user_id: int, digits: str) -> str:

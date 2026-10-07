@@ -34,6 +34,12 @@ class RecoveryIdentifierThrottle(IdentifierThrottle):
     scope = "recovery_account"
 
 
+class ConfirmIdentifierThrottle(IdentifierThrottle):
+    """Limita comprobaciones del código por cuenta."""
+
+    scope = "confirm_account"
+
+
 class ResetIdentifierThrottle(IdentifierThrottle):
     """Limita verificaciones de código por cuenta."""
 
