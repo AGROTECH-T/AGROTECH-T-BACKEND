@@ -32,8 +32,8 @@ ARQUITECTURA ............................... MODULAR POR DOMINIOS
 API ........................................ DJANGO REST FRAMEWORK
 BASE DE DATOS .............................. MARIADB // BASE DE DATOS ÚNICA
 FRONTEND ................................... REACT + TYPESCRIPT // REPOSITORIO SEPARADO
-MÓDULOS DE DOMINIO ......................... 12 // SOLO ANDAMIAJE
-LÓGICA DE NEGOCIO .......................... ○ AÚN NO IMPLEMENTADA
+MÓDULOS DE DOMINIO ......................... 12 // CUENTAS ACTIVO, RESTO ANDAMIAJE
+AUTENTICACIÓN .............................. ● REGISTRO, JWE, OTP Y SESIÓN
 ```
 
 </div>
@@ -46,7 +46,7 @@ LÓGICA DE NEGOCIO .......................... ○ AÚN NO IMPLEMENTADA
 
 | MÓDULO | RUTA | ESTADO | NOTA |
 |:-------|:-----|:------:|:-----|
-| 👤 CUENTAS | `apps/accounts/` | 🟡 ANDAMIAJE | Dominio de autenticación · Cristian · sin implementar |
+| 👤 CUENTAS | `apps/accounts/` | 🟢 ACTIVO | Registro, sesión JWE, OTP y recuperación |
 | 🏡 FINCAS | `apps/farms/` | 🟡 ANDAMIAJE | Dominio multi-finca · sin implementar |
 | 🐔 AVICULTURA | `apps/production/avicultura/` | 🟡 ANDAMIAJE | 🔵 SIGUIENTE · primer módulo productivo |
 | 🐟 PISCICULTURA | `apps/production/piscicultura/` | 🟡 ANDAMIAJE | Reservado |
@@ -62,8 +62,9 @@ LÓGICA DE NEGOCIO .......................... ○ AÚN NO IMPLEMENTADA
 </div>
 
 > [!IMPORTANT]
-> 🟡 `ANDAMIAJE` = carpeta + `AppConfig` de Django, nada más. Sin modelos, sin endpoints, sin lógica de negocio.
-> Solo existe `GET /api/health/` como verificación de infraestructura. Nada más está implementado.
+> 🟡 `ANDAMIAJE` = carpeta + `AppConfig` de Django, nada más.
+> Cuentas ya tiene modelos, servicios y endpoints. El resto de dominios sigue en andamiaje.
+> `GET /api/health/` verifica la infraestructura. La API de acceso vive en `/api/v1/`.
 
 ---
 
@@ -136,7 +137,7 @@ apps/
 
 > [!NOTE]
 > `common/` contiene **únicamente** componentes transversales y realmente reutilizables —
-> nunca lógica específica de un dominio. Está vacío a propósito: sin abstracciones prematuras.
+> nunca lógica específica de un dominio. Hoy solo el formateador de logs JSON.
 
 ---
 
@@ -243,8 +244,8 @@ feature/* ................... ● DESARROLLO AISLADO
 | 🟢 CONFIGURACIÓN DJANGO · MariaDB único | ✅ HECHO |
 | 🟢 CI INICIAL · sintaxis + protección de secretos | ✅ HECHO |
 | 🟢 ESTRUCTURA DE DOCUMENTACIÓN | ✅ HECHO |
-| 🟡 LÓGICA DE NEGOCIO | ⬜ SIN INICIAR |
-| 🟡 INTEGRACIÓN DE AUTENTICACIÓN | ⬜ SIN INICIAR |
+| 🟢 AUTENTICACIÓN DE CUENTAS | ✅ HECHO |
+| 🟡 LÓGICA DE LOS DEMÁS DOMINIOS | ⬜ SIN INICIAR |
 | 🟡 GESTIÓN DE FINCAS | ⬜ SIN INICIAR |
 | 🟡 MÓDULOS PRODUCTIVOS | ⬜ SIN INICIAR |
 
@@ -273,7 +274,7 @@ feature/* ................... ● DESARROLLO AISLADO
 | ESTADO | HITO |
 |:------:|:-----|
 | ✅ | ARQUITECTURA BASE · andamiaje modular |
-| 🔄 | AUTENTICACIÓN · dominio de cuentas |
+| ✅ | AUTENTICACIÓN · dominio de cuentas |
 | 🔄 | MULTI-FINCA · dominio de fincas |
 | 🔄 | AVICULTURA · primer módulo productivo |
 | ⬜ | PISCICULTURA |
@@ -313,9 +314,9 @@ SERVICIOS DE DOMINIO .......... interfaces desacopladas // POR DEFINIR
 MARIADB ....................... BASE DE DATOS ÚNICA
 ```
 
-**Endpoint activo (verificación de infraestructura):** `GET /api/health/` → `{"status": "ok"}`
-> [!NOTE]
-> Aún no existe ningún otro endpoint. En este documento no se inventa ninguno.
+**Salud:** `GET /api/health/` → `{"status": "ok"}`
+**Cuentas:** `/api/v1/` (contrato en [`docs/api/accounts.md`](docs/api/accounts.md))
+**Swagger:** `GET /api/docs/`
 
 </div>
 
@@ -348,7 +349,8 @@ python manage.py check
 
 > [!TIP]
 > **Entorno:** Python 3.13 · Django 5.2 · MariaDB (base de datos única).
-> Copia `.env.example` a `.env` y completa los valores locales — `.env` está ignorado por Git y jamás debe commitearse. Sin Docker obligatorio en esta etapa.
+> Copia `.env.example` a `.env` y completa los valores locales — `.env` está ignorado por Git y jamás debe commitearse.
+> Docker es opcional: `docker compose up --build` levanta MariaDB, Redis y Gunicorn.
 
 ---
 

@@ -1,0 +1,12 @@
+.env
+.git
+.idea
+.vscode
+__pycache__
+.pytest_cache
+.ruff_cache
+.coverage
+coverage.xml
+.venv
+*.pyc
+*.sqlite3

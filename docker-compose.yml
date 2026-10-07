@@ -1,0 +1,53 @@
+# Entorno local con MariaDB 11.8.8 y Django.
+services:
+  mariadb:
+    image: mariadb:11.8.8
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-agrotech_t}
+      MARIADB_USER: ${DB_USER:-agrotech}
+      MARIADB_PASSWORD: ${DB_PASSWORD:?define DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:?define DB_ROOT_PASSWORD}
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      target: production
+    env_file: .env
+    environment:
+      DB_HOST: mariadb
+      DB_PORT: 3306
+      REDIS_URL: redis://redis:6379/0
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mariadb_data:
+  redis_data:

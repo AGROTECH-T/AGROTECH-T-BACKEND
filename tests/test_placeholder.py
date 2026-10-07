@@ -1,5 +1,6 @@
-"""Pruebas del proyecto.
+"""Marcador de pruebas de proyecto.
 
-Sin pruebas funcionales todavía: no existen funcionalidades que probar.
-Aquí vivirán las pruebas por dominio cuando se definan las reglas de negocio.
+Propósito: indicar dónde viven las pruebas que ya existen.
+Contexto: autenticación en apps/accounts/tests; el resto aún no tiene reglas.
+@author Cristian Deysdayr Jimenez
 """

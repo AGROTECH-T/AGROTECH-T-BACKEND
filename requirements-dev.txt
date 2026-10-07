@@ -1,0 +1,7 @@
+# Dependencias de pruebas y calidad.
+-r requirements.txt
+pytest>=8.4,<9
+pytest-django>=4.11,<5
+pytest-cov>=6.2,<7
+pytest-env>=1.1,<2
+ruff>=0.13,<0.14

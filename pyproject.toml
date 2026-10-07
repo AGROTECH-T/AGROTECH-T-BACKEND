@@ -1,0 +1,19 @@
+# Configuración de pruebas y calidad.
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+addopts = "--cov=apps.accounts --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
+env = ["DB_ENGINE=sqlite", "DJANGO_DEBUG=true", "REDIS_URL="]
+
+[tool.coverage.run]
+omit = ["*/migrations/*", "*/tests/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "S", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"apps/accounts/tests/*" = ["S101", "S105", "S106"]

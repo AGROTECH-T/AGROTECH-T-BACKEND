@@ -1,14 +1,14 @@
-"""URLs base. Sin rutas funcionales todavía."""
+"""Rutas raíz de AGROTECH-T-BACKEND.
+
+Propósito: montar el admin, la API y los alias heredados de autenticación.
+Contexto: las rutas oficiales viven en config.api_urls.
+@author Cristian Deysdayr Jimenez
+"""
 from django.contrib import admin
-from django.http import JsonResponse
-from django.urls import path
-
-
-def health(_request):
-    return JsonResponse({"status": "ok", "project": "agrotech-t-backend"})
-
+from django.urls import include, path
 
 urlpatterns = [
     path("admin/", admin.site.urls),
-    path("api/health/", health, name="health"),
+    path("api/", include("config.api_urls")),
+    path("", include("apps.accounts.api.legacy_urls")),
 ]

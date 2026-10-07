@@ -1,9 +1,8 @@
 # common/
 
-Solo componentes realmente transversales y reutilizables
-(ej.: utilidades genuinamente genéricas, cuando existan).
+Solo componentes realmente transversales y reutilizables.
 
 Prohibido colocar aquí lógica específica de avicultura, inventario,
 autenticación, piscicultura u otro dominio.
 
-Actualmente vacío a propósito: no crear abstracciones prematuras.
+Hoy contiene `logging.py`, el formateador JSON de registros.

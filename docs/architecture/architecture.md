@@ -27,7 +27,7 @@ No hay microservicios en esta etapa. No hay múltiples bases de datos.
 
 | Dominio | Ubicación | Responsabilidad prevista (sin implementar) |
 |---|---|---|
-| accounts | `apps/accounts/` | Autenticación (responsable: Cristian) |
+| accounts | `apps/accounts/` | Autenticación implementada: registro, JWE, OTP y sesiones |
 | farms | `apps/farms/` | Fincas, membresías, relación usuario-finca (transversal) |
 | avicultura | `apps/production/avicultura/` | Primer módulo productivo (fase posterior: galpón) |
 | piscicultura | `apps/production/piscicultura/` | Reservado |
@@ -73,7 +73,6 @@ en `docs/decisions/` con su justificación.
 
 ## 7. Infraestructura actual
 
-En esta etapa se utiliza una infraestructura sencilla y viable
-económicamente: un solo proyecto Django, una sola base de datos MariaDB,
-sin Docker complejo y sin orquestación de servicios. `infrastructure/docker/`
-queda reservado para una contenerización básica futura.
+Un solo proyecto Django y una sola base MariaDB. Redis respalda límites de
+tasa y caché. `docker compose` en la raíz es opcional (MariaDB, Redis y
+Gunicorn). El arranque local contra MariaDB instalada sigue siendo válido.

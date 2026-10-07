@@ -1,5 +1,13 @@
-# Dependencias mínimas del backend. NO agregar paquetes sin justificación.
-Django==5.2.*
-djangorestframework==3.16.*
-mysqlclient==2.2.*
-python-dotenv==1.0.*
+# Dependencias de producción de AGROTECH-T-BACKEND.
+Django>=5.2,<5.3
+djangorestframework>=3.16,<3.17
+drf-spectacular>=0.28,<0.29
+django-cors-headers>=4.7,<5
+django-redis>=6,<7
+PyMySQL>=1.1,<2
+cryptography>=45,<47
+jwcrypto>=1.5,<2
+argon2-cffi>=25,<26
+requests>=2.32,<3
+python-dotenv>=1.1,<2
+gunicorn>=23,<24

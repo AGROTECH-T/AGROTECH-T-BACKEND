@@ -1,4 +1,9 @@
 # Documentación de API
 
-Contratos REST por dominio (cuando existan endpoints reales).
-Por ahora solo existe `GET /api/health/` como verificación de infraestructura.
+| Dominio | Contrato |
+|:--------|:---------|
+| Plataforma | `GET /api/health/` |
+| Cuentas | [accounts.md](accounts.md) |
+| OpenAPI | `GET /api/schema/` y `GET /api/docs/` |
+
+Los demás dominios aún no publican endpoints.
