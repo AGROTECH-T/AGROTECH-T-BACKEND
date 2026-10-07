@@ -31,6 +31,17 @@ def test_database_url_selects_postgres(monkeypatch):
     assert chosen["OPTIONS"]["sslmode"] == "require"
 
 
+def test_mariadb_ssl_comes_only_from_env(monkeypatch):
+    """TLS se activa con DB_SSL y no queda un host escrito en el código."""
+    monkeypatch.delenv("DB_ENGINE", raising=False)
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.setenv("DB_SSL", "true")
+    monkeypatch.setenv("DB_HOST", "db.example")
+    chosen = database(Path("/tmp"))
+    assert chosen["OPTIONS"]["ssl"] == {}
+    assert chosen["HOST"] == "db.example"
+
+
 def test_without_url_keeps_mariadb(monkeypatch):
     """Sin DATABASE_URL el runtime local sigue en MariaDB."""
     monkeypatch.delenv("DB_ENGINE", raising=False)
