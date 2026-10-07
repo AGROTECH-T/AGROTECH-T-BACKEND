@@ -1,0 +1,5 @@
+# Dependencias mínimas del backend. NO agregar paquetes sin justificación.
+Django==5.2.*
+djangorestframework==3.16.*
+mysqlclient==2.2.*
+python-dotenv==1.0.*

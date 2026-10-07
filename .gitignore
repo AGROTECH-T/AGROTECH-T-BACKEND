@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+
+# Entorno y secretos — NUNCA commitear valores reales
+.env
+.env.local
+.env.*.local
+
+# MariaDB / MySQL
+*.sql
+*.dump
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# GitHub
+*.pem
+*.key
