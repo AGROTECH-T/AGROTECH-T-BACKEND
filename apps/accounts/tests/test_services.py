@@ -6,11 +6,12 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
+import requests
 from django.test import override_settings
 from django.utils import timezone
 
 from apps.accounts.errors import AppError
-from apps.accounts.integrations import email, whatsapp
+from apps.accounts.integrations import email, sms, whatsapp
 from apps.accounts.models import LoginCode
 from apps.accounts.services import otp_service, token_service
 
@@ -58,36 +59,82 @@ def test_smtp_and_brevo_delivery(monkeypatch):
     monkeypatch.setattr("apps.accounts.integrations.email.send_mail", lambda *args, **kwargs: 1)
     email.send_code("user@example.com", "123456")
     monkeypatch.setenv("BREVO_API_KEY", "test-key")
-    monkeypatch.setattr(
-        "apps.accounts.integrations.email.requests.post",
-        lambda *args, **kwargs: SimpleNamespace(status_code=201),
-    )
+    captured = {}
+
+    def post(*args, **kwargs):
+        captured["json"] = kwargs["json"]
+        return SimpleNamespace(status_code=201)
+
+    monkeypatch.setattr("apps.accounts.integrations.brevo_client.requests.post", post)
     email.send_code("user@example.com", "123456")
+    assert captured["json"]["to"] == [{"email": "user@example.com"}]
 
 
-def test_twilio_whatsapp_send_and_check(monkeypatch):
-    """Twilio envía y valida códigos de WhatsApp mediante peticiones simuladas."""
-    monkeypatch.setenv("TWILIO_ACCOUNT_SID", "AC-test")
-    monkeypatch.setenv("TWILIO_AUTH_TOKEN", "token")
-    monkeypatch.setenv("TWILIO_VERIFY_SERVICE_SID", "VA-test")
-    requests = []
-    approved = SimpleNamespace(status_code=200, json=lambda: {"status": "approved"})
+def test_brevo_sms_and_whatsapp(monkeypatch):
+    """Brevo recibe el SMS de texto y la plantilla de WhatsApp."""
+    monkeypatch.setenv("BREVO_API_KEY", "test-key")
+    monkeypatch.setenv("BREVO_SMS_SENDER", "AGROTECH")
+    monkeypatch.setenv("BREVO_WHATSAPP_SENDER", "573001112233")
+    monkeypatch.setenv("BREVO_WHATSAPP_TEMPLATE_ID", "42")
+    sent = []
 
-    def request(*args, **kwargs):
-        requests.append(kwargs["data"])
-        return approved
+    def post(*args, **kwargs):
+        sent.append(kwargs["json"])
+        return SimpleNamespace(status_code=201)
 
-    monkeypatch.setattr(
-        "apps.accounts.integrations.whatsapp.requests.post",
-        request,
-    )
-    whatsapp.send_code("3001234567")
-    assert whatsapp.check_code("3001234567", "123456")
-    assert requests[0] == {"To": "+573001234567", "Channel": "whatsapp"}
+    monkeypatch.setattr("apps.accounts.integrations.brevo_client.requests.post", post)
+    sms.send_code("3001234567", "123456")
+    whatsapp.send_code("3001234567", "123456")
+    assert sent[0]["recipient"] == "573001234567"
+    assert sent[0]["content"] == "Código AGROTECH-T: 123456. Caduca en pocos minutos."
+    assert sent[1]["contactNumbers"] == ["573001234567"]
+    assert sent[1]["templateId"] == 42
+    assert sent[1]["params"] == {"1": "123456"}
 
 
-def test_twilio_requires_configuration(monkeypatch):
-    """Twilio rechaza llamadas sin credenciales."""
-    monkeypatch.delenv("TWILIO_ACCOUNT_SID", raising=False)
+def test_brevo_failure_and_missing_setup(monkeypatch):
+    """Un rechazo de Brevo o una plantilla vacía no entregan el código."""
+    monkeypatch.setenv("BREVO_API_KEY", "test-key")
+    monkeypatch.setenv("BREVO_SMS_SENDER", "")
     with pytest.raises(AppError):
-        whatsapp.send_code("3001234567")
+        sms.send_code("3001234567", "123456")
+    monkeypatch.setenv("BREVO_SMS_SENDER", "AGROTECH")
+    monkeypatch.setattr(
+        "apps.accounts.integrations.brevo_client.requests.post",
+        lambda *args, **kwargs: SimpleNamespace(status_code=400),
+    )
+    with pytest.raises(AppError):
+        sms.send_code("3001234567", "123456")
+
+    def boom(*args, **kwargs):
+        raise requests.ConnectionError("caido")
+
+    monkeypatch.setattr("apps.accounts.integrations.brevo_client.requests.post", boom)
+    with pytest.raises(AppError):
+        sms.send_code("3001234567", "123456")
+    monkeypatch.delenv("BREVO_WHATSAPP_TEMPLATE_ID", raising=False)
+    with pytest.raises(AppError):
+        whatsapp.send_code("3001234567", "123456")
+
+
+def test_phone_channels_require_brevo(monkeypatch):
+    """Sin clave de Brevo no sale el mensaje de texto."""
+    monkeypatch.delenv("BREVO_API_KEY", raising=False)
+    monkeypatch.setenv("BREVO_SMS_SENDER", "AGROTECH")
+    with pytest.raises(AppError):
+        sms.send_code("3001234567", "123456")
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("channel", ["whatsapp", "sms"])
+def test_phone_code_is_checked_locally(user, monkeypatch, channel):
+    """El código del celular se valida aquí, no en el proveedor."""
+    monkeypatch.setattr("apps.accounts.services.otp_service.secrets.randbelow", lambda _: 123456)
+    monkeypatch.setattr(
+        f"apps.accounts.services.otp_service.{channel}.send_code",
+        lambda *args: None,
+    )
+    otp_service.request_code(user, channel)
+    assert LoginCode.objects.get(user=user).code_hash != "twilio-verify"
+    otp_service.verify_code(user, "123456")
+    assert not LoginCode.objects.filter(user=user).exists()

@@ -41,7 +41,7 @@ def normalize_phone(value: str) -> str:
     normalized = only_digits(value)
     if normalized.startswith("57") and len(normalized) > 10:
         normalized = normalized[-10:]
-    if normalized and not PHONE_PATTERN.fullmatch(normalized):
+    if not PHONE_PATTERN.fullmatch(normalized):
         raise serializers.ValidationError("el celular debe tener solo numeros")
     return normalized
 

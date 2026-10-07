@@ -23,7 +23,7 @@ Documentación interactiva: `/api/schema/` y `/api/docs/`.
 }
 ```
 
-`phone` o `correo` pueden ir vacíos, pero al menos uno es obligatorio.
+`phone` y `correo` son obligatorios. El correo debe incluir `@`.
 
 - `201`: `{"ok": true}`
 - `400`: campos o contraseña inválidos
@@ -69,13 +69,27 @@ Revoca la sesión actual y responde `{"ok": true}`.
 }
 ```
 
-`method` acepta `correo` o `whatsapp`.
+`method` acepta `correo`, `whatsapp` o `sms`. Solo uno por solicitud. A los 10 segundos se puede pedir otro código y el anterior deja de servir.
 
 - `200`: `{"ok": true, "wait": 300}`
 - `400`: cuenta o canal no disponible
-- `429`: OTP vigente; también retorna `wait`
+- `429`: faltan segundos para el reenvío, o se superó la cuota. El código vigente caduca a los 5 minutos. Un reenvío lo reemplaza.
 - `502`: proveedor de correo no disponible
-- `503`: Twilio no configurado o no disponible
+- `503`: Brevo no configurado para WhatsApp o para el mensaje de texto
+
+## Comprobar código
+
+`POST /auth/password/confirm/`
+
+```json
+{
+  "identification": "12345678",
+  "code": "123456"
+}
+```
+
+- `200`: `{"ok": true}`. El código sigue vigente.
+- `401`: código inválido, vencido o con cinco intentos
 
 ## Cambiar contraseña
 

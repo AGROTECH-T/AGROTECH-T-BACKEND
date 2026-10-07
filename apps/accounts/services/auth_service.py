@@ -36,12 +36,21 @@ def login(identification: str, password: str) -> str:
 def recover(identification: str, method: str) -> int:
     """Solicita un OTP sin revelar cuentas inexistentes."""
     user = User.objects.filter(identification=identification).first()
-    unavailable = not user or (method == "whatsapp" and not user.phone) or (
+    needs_phone = method in {"whatsapp", "sms"}
+    unavailable = not user or (needs_phone and not user.phone) or (
         method == "correo" and not user.correo
     )
     if unavailable:
         raise AppError("no se pudo enviar el codigo")
     return otp_service.request_code(user, method)
+
+
+def confirm_code(identification: str, code: str) -> None:
+    """Comprueba el OTP sin consumirlo ni cambiar la contraseña."""
+    user = User.objects.filter(identification=identification).first()
+    if not user:
+        raise AppError("codigo invalido", 401)
+    otp_service.check_code(user, code)
 
 
 def reset_password(identification: str, code: str, password: str) -> None:
