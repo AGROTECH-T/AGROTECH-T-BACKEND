@@ -18,6 +18,7 @@ from apps.accounts.integrations import email, sms, whatsapp
 from apps.accounts.models import LoginCode, User
 
 RESEND_WAIT = 10
+INVALID_CODE = "codigo invalido"
 
 
 def request_code(user: User, channel: str) -> int:
@@ -30,9 +31,9 @@ def request_code(user: User, channel: str) -> int:
             wait = max(1, math.ceil(RESEND_WAIT - elapsed))
             raise AppError(f"Podrás pedir otro código en {wait} segundos.", 429, wait=wait)
     digits = f"{secrets.randbelow(1_000_000):06d}"
-    _deliver(user, channel, digits)
-    stored = _digest(user.pk, digits)
     minutes = _otp_minutes()
+    _deliver(user, channel, digits, minutes)
+    stored = _digest(user.pk, digits)
     LoginCode.objects.update_or_create(
         user=user,
         defaults={
@@ -60,10 +61,10 @@ def _match(user: User, raw_code: str) -> None:
     """Acepta el código o suma un intento fallido."""
     match = re.search(r"\d{6}", raw_code)
     if not match:
-        raise AppError("codigo invalido", 401)
+        raise AppError(INVALID_CODE, 401)
     record = LoginCode.objects.filter(user=user).first()
     if not record or record.attempts >= 5:
-        raise AppError("codigo invalido", 401)
+        raise AppError(INVALID_CODE, 401)
     if record.expires_at <= timezone.now():
         record.delete()
         raise AppError("el codigo vencio", 401)
@@ -75,13 +76,13 @@ def _match(user: User, raw_code: str) -> None:
     if not valid:
         record.attempts += 1
         record.save(update_fields=["attempts"])
-        raise AppError("codigo invalido", 401)
+        raise AppError(INVALID_CODE, 401)
 
 
-def _deliver(user: User, channel: str, digits: str) -> None:
+def _deliver(user: User, channel: str, digits: str, minutes: int) -> None:
     """Entrega el código por correo, WhatsApp o mensaje de texto."""
     if channel == "correo":
-        email.send_code(user.correo, digits)
+        email.send_code(user.correo, digits, minutes)
     elif channel == "whatsapp":
         whatsapp.send_code(user.phone, digits)
     elif channel == "sms":

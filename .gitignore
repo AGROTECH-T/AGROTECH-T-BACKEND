@@ -39,6 +39,11 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
+# Guía de diseño local (skill agrotech-t; no versionar)
+.cursor/diseno-agrotech-t.md
+.cursor/skills/
+
+
 # GitHub
 *.pem
 *.key
