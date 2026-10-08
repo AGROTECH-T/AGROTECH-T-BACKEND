@@ -1,0 +1,43 @@
+---
+description: Reglas transversales de seguridad, diseño y git
+alwaysApply: true
+---
+
+# Reglas transversales
+
+## Seguridad
+
+- No subir secretos, tokens, claves ni contraseñas.
+- Toda configuración sensible debe provenir del entorno.
+
+## Cabeceras
+
+- No colocar en la cabecera la fecha en que se creó el archivo.
+
+## Diseño
+
+- Aplicar POO, SOLID y especialmente responsabilidad única.
+- Reutilizar código existente y evitar cualquier duplicación.
+- Usar Repository solo si desacopla persistencia o consultas complejas.
+- Usar Factory cuando existan variantes reales de construcción.
+- Evitar Singleton manual; respetar el ciclo de vida administrado por Django.
+- Usar Observer para eventos explícitos, sin cadenas ocultas de señales.
+
+## Frontend
+
+- Aplicar HTML semántico al trabajar en frontend o plantillas.
+
+## Despliegue
+
+- Hacer cada cambio primero en local y comprobarlo ahí.
+- Pasar a producción solo después de que el cambio local esté listo.
+
+## Git
+
+- Usar `main`, `develop` y ramas `feature/*`; no hacer force push.
+- Cada commit debe representar un único cambio lógico.
+- Formato: `tipo(ámbito): mensaje imperativo`, máximo 60 caracteres.
+- El cuerpo opcional explica por qué, separado por una línea en blanco.
+- No hacer commit ni push salvo solicitud expresa.
+- Avisos Sonar/lint/ruff del código recién implementado van **en el mismo commit**
+  de esa funcionalidad; nunca un commit aparte solo por el arreglo.
