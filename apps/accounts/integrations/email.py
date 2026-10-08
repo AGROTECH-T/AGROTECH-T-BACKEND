@@ -10,15 +10,23 @@ from django.core.mail import send_mail
 
 from apps.accounts.errors import AppError
 from apps.accounts.integrations.brevo_client import post
+from apps.accounts.integrations.otp_mail_body import html as otp_html
+from apps.accounts.integrations.otp_mail_body import plain as otp_plain
 
 FAILURE = "no se pudo enviar el correo"
 
 
-def send_code(address: str, digits: str) -> None:
-    """Envía un OTP mediante la API de Brevo o SMTP."""
+def send_code(address: str, digits: str, minutes: int = 5) -> None:
+    """Envía un OTP mediante la API de Brevo o SMTP.
+
+    @param address: Correo destino.
+    @param digits: Código de seis cifras.
+    @param minutes: Vigencia mostrada en el mensaje.
+    """
     if not settings.DEFAULT_FROM_EMAIL or not address:
         raise AppError(FAILURE, 502)
-    message = f"Código {digits}. Caduca en pocos minutos."
+    text = otp_plain(digits, minutes)
+    rich = otp_html(digits, minutes)
     if os.getenv("BREVO_API_KEY"):
         post(
             "/smtp/email",
@@ -26,23 +34,25 @@ def send_code(address: str, digits: str) -> None:
                 "sender": {"name": "AGROTECH-T", "email": settings.DEFAULT_FROM_EMAIL},
                 "to": [{"email": address}],
                 "subject": "Código de acceso AGROTECH-T",
-                "textContent": message,
+                "textContent": text,
+                "htmlContent": rich,
             },
             FAILURE,
         )
         return
-    _send_smtp(address, message)
+    _send_smtp(address, text, rich)
 
 
-def _send_smtp(address: str, message: str) -> None:
-    """Entrega el mismo texto por el correo SMTP configurado."""
+def _send_smtp(address: str, text: str, rich: str) -> None:
+    """Entrega el mismo contenido por SMTP."""
     try:
         delivered = send_mail(
             "Código de acceso AGROTECH-T",
-            message,
+            text,
             settings.DEFAULT_FROM_EMAIL,
             [address],
             fail_silently=False,
+            html_message=rich,
         )
     except OSError as exc:
         raise AppError(FAILURE, 502) from exc

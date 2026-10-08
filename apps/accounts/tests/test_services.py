@@ -66,8 +66,12 @@ def test_smtp_and_brevo_delivery(monkeypatch):
         return SimpleNamespace(status_code=201)
 
     monkeypatch.setattr("apps.accounts.integrations.brevo_client.requests.post", post)
-    email.send_code("user@example.com", "123456")
+    email.send_code("user@example.com", "123456", 5)
     assert captured["json"]["to"] == [{"email": "user@example.com"}]
+    assert "htmlContent" in captured["json"]
+    assert "123456" in captured["json"]["htmlContent"]
+    assert "Caduca en 5 minutos" in captured["json"]["htmlContent"]
+    assert "no compartas" in captured["json"]["htmlContent"].lower()
 
 
 def test_brevo_sms_and_whatsapp(monkeypatch):
