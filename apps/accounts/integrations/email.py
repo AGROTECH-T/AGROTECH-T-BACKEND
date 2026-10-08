@@ -33,21 +33,21 @@ def send_code(address: str, digits: str, minutes: int = 5) -> None:
             {
                 "sender": {"name": "AGROTECH-T", "email": settings.DEFAULT_FROM_EMAIL},
                 "to": [{"email": address}],
-                "subject": "Código de acceso AGROTECH-T",
+                "subject": f"Tu código AGROTECH-T · {minutes} min",
                 "textContent": text,
                 "htmlContent": rich,
             },
             FAILURE,
         )
         return
-    _send_smtp(address, text, rich)
+    _send_smtp(address, text, rich, minutes)
 
 
-def _send_smtp(address: str, text: str, rich: str) -> None:
+def _send_smtp(address: str, text: str, rich: str, minutes: int) -> None:
     """Entrega el mismo contenido por SMTP."""
     try:
         delivered = send_mail(
-            "Código de acceso AGROTECH-T",
+            f"Tu código AGROTECH-T · {minutes} min",
             text,
             settings.DEFAULT_FROM_EMAIL,
             [address],

@@ -40,8 +40,13 @@ def html(digits: str, minutes: int) -> str:
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef3ec;padding:28px 12px;">
 <tr><td align="center">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border-radius:18px;overflow:hidden;border:1px solid #d5e2d0;">
-<tr><td style="padding:22px 24px 12px;background:linear-gradient(90deg,#2c9b45 0%,#1a3a7a 70%,#1db5e0 100%);">
-<table role="presentation" cellspacing="0" cellpadding="0"><tr>
+<tr><td style="padding:0;background:#1a3a7a;">
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+<tr><td style="height:6px;background:#2c9b45;font-size:0;line-height:0;">&nbsp;</td>
+<td style="height:6px;background:#1db5e0;font-size:0;line-height:0;">&nbsp;</td></tr>
+</table>
+<table role="presentation" cellspacing="0" cellpadding="0" style="padding:20px 24px 16px;">
+<tr>
 <td style="vertical-align:middle;padding-right:14px;">{mark}</td>
 <td style="vertical-align:middle;">
 <div style="font-size:22px;font-weight:800;letter-spacing:0.04em;line-height:1.1;">
