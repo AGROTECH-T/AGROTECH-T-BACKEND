@@ -13,6 +13,7 @@ from rest_framework.views import APIView
 from apps.accounts.api.serializers import (
     AccountResponseSerializer,
     LoginSerializer,
+    ProfileUpdateSerializer,
     RecoverSerializer,
     RecoveryResponseSerializer,
     RegisterSerializer,
@@ -119,6 +120,14 @@ class MeView(APIView):
     def get(self, request: Request) -> Response:
         """Retorna los datos visibles del usuario actual."""
         return Response(_account_payload(request.user))
+
+    @extend_schema(request=ProfileUpdateSerializer, responses={200: AccountResponseSerializer})
+    def patch(self, request: Request) -> Response:
+        """Actualiza el nombre, el correo y el celular del perfil."""
+        serializer = ProfileUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        user = auth_service.update_profile(request.user, serializer.validated_data)
+        return Response(_account_payload(user))
 
 
 class LogoutView(APIView):
