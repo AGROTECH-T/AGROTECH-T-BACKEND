@@ -19,6 +19,18 @@ def register(data: dict) -> None:
         raise AppError("esa identificacion ya esta registrada", 409) from exc
 
 
+PROFILE_FIELDS = ("first_name", "last_name", "correo", "phone")
+
+
+def update_profile(user: User, data: dict) -> User:
+    """Actualiza los datos editables y conserva el documento."""
+    for field in PROFILE_FIELDS:
+        if field in data:
+            setattr(user, field, data[field])
+    user.save(update_fields=[field for field in PROFILE_FIELDS if field in data])
+    return user
+
+
 def login(identification: str, password: str) -> str:
     """Valida credenciales y abre una sesión única."""
     user = User.objects.filter(identification=identification).first()
