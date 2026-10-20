@@ -113,22 +113,12 @@ class RenewView(APIView):
 
 
 class MeView(APIView):
-    """Expone la cuenta autenticada sin incluir secretos."""
+    """Expone y actualiza la cuenta autenticada sin incluir secretos."""
 
     @extend_schema(responses={200: AccountResponseSerializer})
     def get(self, request: Request) -> Response:
         """Retorna los datos visibles del usuario actual."""
-        user = request.user
-        return Response(
-            {
-                "id": user.pk,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "identification": user.identification,
-                "phone": user.phone,
-                "correo": user.correo,
-            }
-        )
+        return Response(_account_payload(request.user))
 
 
 class LogoutView(APIView):
@@ -139,6 +129,19 @@ class LogoutView(APIView):
         """Revoca inmediatamente el token vigente."""
         auth_service.logout(request.user)
         return Response({"ok": True})
+
+
+def _account_payload(user) -> dict:
+    """Arma los datos públicos de una cuenta autenticada."""
+    return {
+        "id": user.pk,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "identification": user.identification,
+        "phone": user.phone,
+        "correo": user.correo,
+        "is_active": user.is_active,
+    }
 
 
 def _token_response(token: str) -> Response:

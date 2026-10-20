@@ -98,6 +98,7 @@ class AccountResponseSerializer(serializers.Serializer):
     identification = serializers.CharField()
     phone = serializers.CharField()
     correo = serializers.EmailField()
+    is_active = serializers.BooleanField()
 
 
 class SuccessResponseSerializer(serializers.Serializer):
