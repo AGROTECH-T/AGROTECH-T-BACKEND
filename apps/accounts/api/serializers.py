@@ -34,6 +34,30 @@ class RegisterSerializer(serializers.Serializer):
         return attrs
 
 
+class ProfileUpdateSerializer(serializers.Serializer):
+    """Valida los datos editables del perfil.
+
+    El documento no se declara: la identificación nunca se modifica.
+    """
+
+    first_name = serializers.CharField(max_length=40)
+    last_name = serializers.CharField(max_length=40)
+    correo = serializers.EmailField()
+    phone = serializers.CharField(max_length=30)
+
+    def validate(self, attrs: dict) -> dict:
+        """Normaliza el nombre, el correo y el celular recibidos."""
+        if "first_name" in attrs:
+            attrs["first_name"] = normalize_name(attrs["first_name"], "primer nombre")
+        if "last_name" in attrs:
+            attrs["last_name"] = normalize_name(attrs["last_name"], "primer apellido")
+        if "correo" in attrs:
+            attrs["correo"] = attrs["correo"].strip().lower()
+        if "phone" in attrs:
+            attrs["phone"] = normalize_phone(attrs["phone"])
+        return attrs
+
+
 class LoginSerializer(serializers.Serializer):
     """Valida credenciales de inicio de sesión."""
 
@@ -98,6 +122,7 @@ class AccountResponseSerializer(serializers.Serializer):
     identification = serializers.CharField()
     phone = serializers.CharField()
     correo = serializers.EmailField()
+    is_active = serializers.BooleanField()
 
 
 class SuccessResponseSerializer(serializers.Serializer):
