@@ -47,7 +47,7 @@ AUTENTICACIÓN .............................. ● REGISTRO, JWE, OTP Y SESIÓN
 | MÓDULO | RUTA | ESTADO | NOTA |
 |:-------|:-----|:------:|:-----|
 | 👤 CUENTAS | `apps/accounts/` | 🟢 ACTIVO | Registro, sesión JWE, OTP y recuperación |
-| 🏡 FINCAS | `apps/farms/` | 🟡 ANDAMIAJE | Dominio multi-finca · sin implementar |
+| 🏡 FINCAS | `apps/farms/` | 🟡 V1 EN REVISIÓN | Fincas, membresías y roles base · sin permisos por rol |
 | 🐔 AVICULTURA | `apps/production/avicultura/` | 🟡 ANDAMIAJE | 🔵 SIGUIENTE · primer módulo productivo |
 | 🐟 PISCICULTURA | `apps/production/piscicultura/` | 🟡 ANDAMIAJE | Reservado |
 | 🐖 PORCICULTURA | `apps/production/porcicultura/` | 🟡 ANDAMIAJE | Reservado |
@@ -63,7 +63,7 @@ AUTENTICACIÓN .............................. ● REGISTRO, JWE, OTP Y SESIÓN
 
 > [!IMPORTANT]
 > 🟡 `ANDAMIAJE` = carpeta + `AppConfig` de Django, nada más.
-> Cuentas ya tiene modelos, servicios y endpoints. El resto de dominios sigue en andamiaje.
+> Cuentas y Farms ya tienen implementación. El resto de dominios sigue en andamiaje.
 > `GET /api/health/` verifica la infraestructura. La API de acceso vive en `/api/v1/`.
 
 ---
@@ -190,7 +190,7 @@ apps/
 
 | CAMPO | VALOR |
 |:------|:------|
-| ESTADO | 🟡 DESARROLLO // solo andamiaje base |
+| ESTADO | 🟡 DESARROLLO // Accounts activo · Farms v1 en revisión |
 | TIPO | PLATAFORMA AGROPECUARIA SaaS · multi-finca |
 | ARQUITECTURA | ARQUITECTURA MODULAR POR DOMINIOS |
 | BACKEND | DJANGO 5.2 + DJANGO REST FRAMEWORK |
@@ -245,8 +245,8 @@ feature/* ................... ● DESARROLLO AISLADO
 | 🟢 CI INICIAL · sintaxis + protección de secretos | ✅ HECHO |
 | 🟢 ESTRUCTURA DE DOCUMENTACIÓN | ✅ HECHO |
 | 🟢 AUTENTICACIÓN DE CUENTAS | ✅ HECHO |
-| 🟡 LÓGICA DE LOS DEMÁS DOMINIOS | ⬜ SIN INICIAR |
-| 🟡 GESTIÓN DE FINCAS | ⬜ SIN INICIAR |
+| 🟡 LÓGICA DE LOS DEMÁS DOMINIOS (EXCEPTO FARMS V1) | ⬜ SIN INICIAR |
+| 🟡 GESTIÓN DE FINCAS | 🟡 V1 EN REVISIÓN |
 | 🟡 MÓDULOS PRODUCTIVOS | ⬜ SIN INICIAR |
 
 </div>
@@ -275,7 +275,7 @@ feature/* ................... ● DESARROLLO AISLADO
 |:------:|:-----|
 | ✅ | ARQUITECTURA BASE · andamiaje modular |
 | ✅ | AUTENTICACIÓN · dominio de cuentas |
-| 🔄 | MULTI-FINCA · dominio de fincas |
+| 🟡 | MULTI-FINCA · v1 en revisión |
 | 🔄 | AVICULTURA · primer módulo productivo |
 | ⬜ | PISCICULTURA |
 | ⬜ | PORCICULTURA |
@@ -288,7 +288,7 @@ feature/* ................... ● DESARROLLO AISLADO
 | ⬜ | IoT · sensores y dispositivos |
 | ⬜ | IA · visión |
 
-> ✅ hecho · 🔄 siguiente en cola (sin iniciar) · ⬜ planificado/reservado
+> ✅ hecho · 🟡 en revisión · 🔄 siguiente en cola (sin iniciar) · ⬜ planificado/reservado
 
 </div>
 
@@ -316,6 +316,7 @@ MARIADB ....................... BASE DE DATOS ÚNICA
 
 **Salud:** `GET /api/health/` → `{"status": "ok"}`
 **Cuentas:** `/api/v1/` (contrato en [`docs/api/accounts.md`](docs/api/accounts.md))
+**Fincas:** `/api/v1/farms/` (contrato en [`docs/api/farms.md`](docs/api/farms.md))
 **Swagger:** `GET /api/docs/`
 
 </div>
