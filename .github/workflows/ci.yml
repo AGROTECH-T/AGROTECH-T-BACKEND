@@ -38,7 +38,7 @@ jobs:
           fi
           cat > "$RUNNER_TEMP/agrotech-farms-test-grants.sql" <<'SQL'
           REVOKE ALL PRIVILEGES ON `agrotech\_farms\_test`.* FROM 'agrotech_test_user'@'%';
-          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER
+          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX
             ON `agrotech\_farms\_test`.* TO 'agrotech_test_user'@'%';
           SQL
           docker run --detach \
