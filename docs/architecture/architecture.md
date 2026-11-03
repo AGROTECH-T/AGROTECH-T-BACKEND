@@ -25,10 +25,10 @@ No hay microservicios en esta etapa. No hay múltiples bases de datos.
 
 ## 3. Separación por dominios
 
-| Dominio | Ubicación | Responsabilidad prevista (sin implementar) |
+| Dominio | Ubicación | Responsabilidad y estado |
 |---|---|---|
 | accounts | `apps/accounts/` | Autenticación implementada: registro, JWE, OTP y sesiones |
-| farms | `apps/farms/` | Fincas, membresías, relación usuario-finca (transversal) |
+| farms | `apps/farms/` | Fincas y membresías v1 en revisión; permisos por rol pendientes |
 | avicultura | `apps/production/avicultura/` | Primer módulo productivo (fase posterior: galpón) |
 | piscicultura | `apps/production/piscicultura/` | Reservado |
 | porcicultura | `apps/production/porcicultura/` | Reservado |

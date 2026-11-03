@@ -1,7 +1,8 @@
-"""Dominio farms (esqueleto, sin lógica).
+"""Dominio de fincas y membresías.
 
-Dominio transversal: fincas, membresías y relaciones usuario-finca.
-Sin reglas de negocio definidas todavía: no implementar.
+Propósito: representar fincas y la relación de cada cuenta con su rol.
+Contexto: v1 expone listado, creación y consulta; la autorización por rol queda
+para una fase posterior.
 """
 from django.apps import AppConfig
 

@@ -22,8 +22,66 @@ jobs:
         run: python -m py_compile manage.py config/settings.py config/urls.py config/api_urls.py
       - name: Lint
         run: ruff check .
+      - name: Start MariaDB test service
+        env:
+          MARIADB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK_PR: ${{ github.event.pull_request.head.repo.fork }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ] && [ "$IS_FORK_PR" = "true" ]; then
+            echo "::error::El CI con MariaDB no puede ejecutarse en un pull request de fork porque TEST_DB_PASSWORD no esta disponible. Las pruebas no se ejecutaran."
+            exit 1
+          fi
+          if [ -z "$MARIADB_PASSWORD" ]; then
+            echo "::error::Configura el secreto TEST_DB_PASSWORD para el servicio de pruebas."
+            exit 1
+          fi
+          cat > "$RUNNER_TEMP/agrotech-farms-test-grants.sql" <<'SQL'
+          REVOKE ALL PRIVILEGES ON `agrotech\_farms\_test`.* FROM 'agrotech_test_user'@'%';
+          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX
+            ON `agrotech\_farms\_test`.* TO 'agrotech_test_user'@'%';
+          SQL
+          docker run --detach \
+            --name agrotech-farms-test \
+            --publish 127.0.0.1:3307:3307 \
+            --volume "$RUNNER_TEMP/agrotech-farms-test-grants.sql:/docker-entrypoint-initdb.d/90-grants.sql:ro" \
+            --env MARIADB_DATABASE=agrotech_farms_test \
+            --env MARIADB_USER=agrotech_test_user \
+            --env MARIADB_PASSWORD \
+            --env MARIADB_RANDOM_ROOT_PASSWORD=yes \
+            --env MARIADB_ROOT_HOST=localhost \
+            --health-cmd="healthcheck.sh --connect --innodb_initialized" \
+            --health-interval=5s \
+            --health-timeout=5s \
+            --health-retries=20 \
+            --health-start-period=10s \
+            mariadb:11.8.8 --port=3307
+      - name: Wait for MariaDB
+        run: |
+          for attempt in $(seq 1 45); do
+            status="$(docker inspect --format '{{.State.Health.Status}}' agrotech-farms-test)"
+            if [ "$status" = "healthy" ]; then
+              echo "MariaDB de pruebas disponible en 127.0.0.1:3307."
+              exit 0
+            fi
+            if [ "$status" = "unhealthy" ]; then
+              echo "::error::MariaDB no supero el healthcheck."
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "::error::MariaDB no estuvo disponible a tiempo."
+          exit 1
       - name: Tests
-        run: pytest
+        env:
+          TEST_DB_USER: agrotech_test_user
+          TEST_DB_PASSWORD: ${{ secrets.TEST_DB_PASSWORD }}
+        run: |
+          if [ -z "$TEST_DB_USER" ] || [ -z "$TEST_DB_PASSWORD" ]; then
+            echo "::error::Faltan las credenciales de la base de pruebas."
+            exit 1
+          fi
+          python -m pytest --reuse-db
       - name: Proteccion de secretos
         run: |
           test ! -f .env || (echo ".env no debe existir en CI" && exit 1)
