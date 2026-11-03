@@ -1,6 +1,6 @@
 """Casos de uso del dominio de fincas.
 
-Propósito: crear fincas con su membresía inicial y consultar membresías.
+Propósito: crear, consultar, actualizar y eliminar fincas con membresía.
 Contexto: el usuario autenticado se resuelve fuera del servicio.
 """
 from django.db import transaction
@@ -49,6 +49,30 @@ def get_membership(*, user: User, farm_id: int) -> FarmMembership | None:
         .select_related("farm")
         .first()
     )
+
+
+def update_farm(*, user: User, farm_id: int, name: str) -> FarmMembership:
+    """Actualiza el nombre de una finca; solo el administrador."""
+    membership = _require_admin_membership(user=user, farm_id=farm_id)
+    membership.farm.name = _validate_farm_name(name)
+    membership.farm.save(update_fields=["name", "updated_at"])
+    return membership
+
+
+def delete_farm(*, user: User, farm_id: int) -> None:
+    """Elimina una finca y sus membresías; solo el administrador."""
+    membership = _require_admin_membership(user=user, farm_id=farm_id)
+    membership.farm.delete()
+
+
+def _require_admin_membership(*, user: User, farm_id: int) -> FarmMembership:
+    """Exige membresía administradora o responde 404/403."""
+    membership = get_membership(user=user, farm_id=farm_id)
+    if membership is None:
+        raise AppError("finca no encontrada", 404)
+    if membership.role != FarmRole.ADMINISTRADOR:
+        raise AppError("solo el administrador puede hacer este cambio", 403)
+    return membership
 
 
 def _create_owner_membership(farm: Farm, user: User) -> FarmMembership:

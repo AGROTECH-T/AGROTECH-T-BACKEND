@@ -1,6 +1,6 @@
 """Vistas del dominio de fincas.
 
-Propósito: listar, crear y consultar fincas con aislamiento por membresía.
+Propósito: listar, crear, consultar, actualizar y eliminar fincas.
 Contexto: la autenticación y el permiso global ya exigen una cuenta activa.
 """
 from django.http import Http404
@@ -11,7 +11,11 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.farms import services
-from apps.farms.serializers import FarmCreateSerializer, FarmResponseSerializer
+from apps.farms.serializers import (
+    FarmCreateSerializer,
+    FarmResponseSerializer,
+    FarmUpdateSerializer,
+)
 
 
 class FarmErrorResponseSerializer(serializers.Serializer):
@@ -77,7 +81,7 @@ class FarmListCreateView(APIView):
 
 
 class FarmDetailView(APIView):
-    """Consulta una finca solo si el usuario pertenece a ella."""
+    """Consulta, actualiza o elimina una finca según membresía y rol."""
 
     @extend_schema(
         tags=["farms"],
@@ -103,3 +107,37 @@ class FarmDetailView(APIView):
         if membership is None:
             raise Http404
         return Response(FarmResponseSerializer(membership).data)
+
+    @extend_schema(
+        tags=["farms"],
+        request=FarmUpdateSerializer,
+        responses={
+            200: OpenApiResponse(response=FarmResponseSerializer),
+            400: OpenApiResponse(response=FarmErrorResponseSerializer),
+            403: OpenApiResponse(response=FarmErrorResponseSerializer),
+            404: OpenApiResponse(response=FarmErrorResponseSerializer),
+        },
+    )
+    def put(self, request: Request, farm_id: int) -> Response:
+        """Actualiza el nombre; solo el administrador de la finca."""
+        serializer = FarmUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        membership = services.update_farm(
+            user=request.user,
+            farm_id=farm_id,
+            name=serializer.validated_data["name"],
+        )
+        return Response(FarmResponseSerializer(membership).data)
+
+    @extend_schema(
+        tags=["farms"],
+        responses={
+            204: OpenApiResponse(description="Finca eliminada."),
+            403: OpenApiResponse(response=FarmErrorResponseSerializer),
+            404: OpenApiResponse(response=FarmErrorResponseSerializer),
+        },
+    )
+    def delete(self, request: Request, farm_id: int) -> Response:
+        """Elimina la finca; solo el administrador."""
+        services.delete_farm(user=request.user, farm_id=farm_id)
+        return Response(status=status.HTTP_204_NO_CONTENT)

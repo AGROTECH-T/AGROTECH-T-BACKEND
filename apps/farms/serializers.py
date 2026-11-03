@@ -9,12 +9,12 @@ from apps.farms.models import FarmRole
 
 
 class FarmCreateSerializer(serializers.Serializer):
-    """Valida el único dato editable al crear una finca."""
+    """Valida el único dato editable al crear o actualizar una finca."""
 
     name = serializers.CharField(max_length=100, allow_blank=False)
 
     def to_internal_value(self, data):
-        """Rechaza los campos que no pertenecen al contrato de creación."""
+        """Rechaza los campos que no pertenecen al contrato."""
         if hasattr(data, "keys"):
             extra_fields = sorted(set(data.keys()) - set(self.fields))
             if extra_fields:
@@ -22,6 +22,9 @@ class FarmCreateSerializer(serializers.Serializer):
                     {field: "Campo no permitido." for field in extra_fields}
                 )
         return super().to_internal_value(data)
+
+
+FarmUpdateSerializer = FarmCreateSerializer
 
 
 class FarmResponseSerializer(serializers.Serializer):

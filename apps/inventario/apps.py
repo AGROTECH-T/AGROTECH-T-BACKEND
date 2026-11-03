@@ -1,8 +1,8 @@
-"""Dominio inventario (esqueleto, sin lógica).
+"""Dominio de inventario por finca.
 
-Responsabilidad futura (responsable: Cristian). No implementar en esta fase.
-Otros dominios NO deben modificar sus estructuras internas directamente:
-solo vía interfaces/servicios definidos.
+Propósito: productos con código de barras, stock y movimientos.
+Contexto: cada producto pertenece a una finca con membresía.
+@author Cristian Deysdayr Jimenez
 """
 from django.apps import AppConfig
 

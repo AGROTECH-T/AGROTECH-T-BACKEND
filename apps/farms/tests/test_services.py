@@ -65,3 +65,27 @@ def test_create_farm_rejects_name_over_max_length(user):
     assert error.value.status_code == 400
     assert not Farm.objects.exists()
     assert not FarmMembership.objects.exists()
+
+
+def test_update_farm_changes_name(user):
+    """El administrador actualiza el nombre de su finca."""
+    membership = services.create_farm(user=user, name="Viejo")
+
+    updated = services.update_farm(
+        user=user,
+        farm_id=membership.farm_id,
+        name="Nuevo",
+    )
+
+    assert updated.farm.name == "Nuevo"
+
+
+def test_delete_farm_removes_memberships(user):
+    """Al eliminar la finca también se borran las membresías."""
+    membership = services.create_farm(user=user, name="Temporal")
+    farm_id = membership.farm_id
+
+    services.delete_farm(user=user, farm_id=farm_id)
+
+    assert not Farm.objects.filter(pk=farm_id).exists()
+    assert not FarmMembership.objects.filter(farm_id=farm_id).exists()

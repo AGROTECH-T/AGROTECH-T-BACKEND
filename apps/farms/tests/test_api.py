@@ -253,7 +253,7 @@ def test_foreign_and_missing_farm_return_same_404_body(login, make_user):
 
 
 def test_anonymous_requests_are_rejected(client, user):
-    """Las tres rutas exigen la autenticación Bearer existente."""
+    """Las rutas de fincas exigen la autenticación Bearer existente."""
     farm = Farm.objects.create(name="La Esperanza")
     FarmMembership.objects.create(
         farm=farm,
@@ -267,3 +267,118 @@ def test_anonymous_requests_are_rejected(client, user):
         == 401
     )
     assert client.get(f"/api/v1/farms/{farm.pk}/").status_code == 401
+    assert (
+        client.put(
+            f"/api/v1/farms/{farm.pk}/",
+            {"name": "Otro"},
+            format="json",
+        ).status_code
+        == 401
+    )
+    assert client.delete(f"/api/v1/farms/{farm.pk}/").status_code == 401
+
+
+def test_admin_can_update_farm_name(auth_client, user):
+    """El administrador puede cambiar el nombre de su finca."""
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    response = auth_client.put(
+        f"/api/v1/farms/{farm.pk}/",
+        {"name": "La Nueva Esperanza"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert response.data["name"] == "La Nueva Esperanza"
+    farm.refresh_from_db()
+    assert farm.name == "La Nueva Esperanza"
+
+
+def test_non_admin_cannot_update_farm(login, make_user):
+    """Operador o consulta no pueden actualizar la finca."""
+    owner = make_user("11111111")
+    operator = make_user("22222222")
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=owner,
+        role=FarmRole.ADMINISTRADOR,
+    )
+    FarmMembership.objects.create(
+        farm=farm,
+        user=operator,
+        role=FarmRole.OPERADOR,
+    )
+
+    response = login(operator).put(
+        f"/api/v1/farms/{farm.pk}/",
+        {"name": "Hack"},
+        format="json",
+    )
+
+    assert response.status_code == 403
+    farm.refresh_from_db()
+    assert farm.name == "La Esperanza"
+
+
+def test_admin_can_delete_farm(auth_client, user):
+    """El administrador elimina la finca y sus membresías."""
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    response = auth_client.delete(f"/api/v1/farms/{farm.pk}/")
+
+    assert response.status_code == 204
+    assert not Farm.objects.filter(pk=farm.pk).exists()
+    assert not FarmMembership.objects.filter(farm_id=farm.pk).exists()
+
+
+def test_non_admin_cannot_delete_farm(login, make_user):
+    """Consulta no puede eliminar la finca."""
+    owner = make_user("11111111")
+    viewer = make_user("22222222")
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=owner,
+        role=FarmRole.ADMINISTRADOR,
+    )
+    FarmMembership.objects.create(
+        farm=farm,
+        user=viewer,
+        role=FarmRole.CONSULTA,
+    )
+
+    response = login(viewer).delete(f"/api/v1/farms/{farm.pk}/")
+
+    assert response.status_code == 403
+    assert Farm.objects.filter(pk=farm.pk).exists()
+
+
+def test_update_foreign_farm_returns_404(login, make_user):
+    """Actualizar una finca ajena responde 404."""
+    owner = make_user("11111111")
+    outsider = make_user("22222222")
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=owner,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    response = login(outsider).put(
+        f"/api/v1/farms/{farm.pk}/",
+        {"name": "Ajena"},
+        format="json",
+    )
+
+    assert response.status_code == 404
