@@ -13,15 +13,29 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 import config.settings_test as test_settings
 import conftest as test_guard
 
+VALID_DB = "agrotech_farms_validation"
+VALID_USER = "agrotech_validation_user"
+DUMMY_CREDENTIAL = "dummy-value"
+PROTECTED = ("agrotech_db", "agrotech_t", "agrotech_farms_test")
 
-def _valid_default() -> dict:
-    return {
+
+@pytest.fixture(autouse=True)
+def _isolated_credentials(monkeypatch):
+    """Aísla cada prueba con credenciales ficticias, nunca reales."""
+    monkeypatch.setenv("TEST_DB_USER", VALID_USER)
+    monkeypatch.setenv("TEST_DB_PASSWORD", DUMMY_CREDENTIAL)
+
+
+def _valid_default(**overrides) -> dict:
+    default = {
         "ENGINE": "django.db.backends.mysql",
-        "NAME": "agrotech_farms_test",
+        "NAME": VALID_DB,
         "HOST": "127.0.0.1",
         "PORT": "3307",
-        "TEST": {"NAME": "agrotech_farms_test"},
+        "TEST": {"NAME": VALID_DB},
     }
+    default.update(overrides)
+    return default
 
 
 def test_engine_is_mysql():
@@ -30,8 +44,8 @@ def test_engine_is_mysql():
 
 def test_name_and_test_name_are_authorized():
     default = test_settings.DATABASES["default"]
-    assert default["NAME"] == "agrotech_farms_test"
-    assert default["TEST"]["NAME"] == "agrotech_farms_test"
+    assert default["NAME"] == VALID_DB
+    assert default["TEST"]["NAME"] == VALID_DB
 
 
 def test_host_and_port_are_fixed():
@@ -40,12 +54,53 @@ def test_host_and_port_are_fixed():
     assert default["PORT"] == "3307"
 
 
-def test_no_default_credentials(monkeypatch):
+def test_build_database_without_credentials_does_not_raise(monkeypatch):
     monkeypatch.delenv("TEST_DB_USER", raising=False)
     monkeypatch.delenv("TEST_DB_PASSWORD", raising=False)
     database = test_settings.build_test_database()
     assert database["USER"] is None
     assert database["PASSWORD"] is None
+    test_settings.validate_test_database({"default": database})
+
+
+@pytest.mark.parametrize("variable", ["TEST_DB_USER", "TEST_DB_PASSWORD"])
+@pytest.mark.parametrize("value", ["", " ", "   ", "\t", "\n\t "])
+def test_build_database_preserves_blank_values(monkeypatch, variable, value):
+    monkeypatch.setenv(variable, value)
+    database = test_settings.build_test_database()
+    key = "USER" if variable == "TEST_DB_USER" else "PASSWORD"
+    assert database[key] == value
+
+
+@pytest.mark.parametrize("variable", ["TEST_DB_USER", "TEST_DB_PASSWORD"])
+@pytest.mark.parametrize("value", [None, "", " ", "   ", "\t", "\n\t "])
+def test_validate_test_credentials_rejects_blank(monkeypatch, variable, value):
+    user = VALID_USER
+    password = DUMMY_CREDENTIAL
+    if variable == "TEST_DB_USER":
+        user = value
+    else:
+        password = value
+    with pytest.raises(ImproperlyConfigured, match=variable):
+        test_settings.validate_test_credentials(user, password)
+
+
+def test_valid_credentials_pass_validation(monkeypatch):
+    monkeypatch.setenv("TEST_DB_USER", VALID_USER)
+    monkeypatch.setenv("TEST_DB_PASSWORD", DUMMY_CREDENTIAL)
+    database = test_settings.build_test_database()
+    assert database["USER"] == os.environ["TEST_DB_USER"]
+    assert database["PASSWORD"] == os.environ["TEST_DB_PASSWORD"]
+    test_settings.validate_test_credentials(database["USER"], database["PASSWORD"])
+    test_settings.validate_test_database({"default": database})
+
+
+def test_credentials_with_surrounding_spaces_are_preserved(monkeypatch):
+    monkeypatch.setenv("TEST_DB_USER", f" {VALID_USER} ")
+    monkeypatch.setenv("TEST_DB_PASSWORD", "  dummy-value  ")
+    database = test_settings.build_test_database()
+    assert database["USER"] == os.environ["TEST_DB_USER"]
+    assert database["PASSWORD"] == os.environ["TEST_DB_PASSWORD"]
 
 
 def test_credentials_come_only_from_environment(monkeypatch):
@@ -56,6 +111,56 @@ def test_credentials_come_only_from_environment(monkeypatch):
     assert database["PASSWORD"] == os.environ["TEST_DB_PASSWORD"]
 
 
+def test_validate_test_credentials_accepts_password_with_legitimate_spaces():
+    test_settings.validate_test_credentials(VALID_USER, "  contraseña con espacios  ")
+
+
+def test_authorized_database_comes_from_environment(monkeypatch):
+    monkeypatch.setenv("TEST_DB_NAME", VALID_DB)
+    database = test_settings.build_test_database()
+    assert database["NAME"] == VALID_DB
+    assert database["TEST"]["NAME"] == VALID_DB
+    test_settings.validate_test_database({"default": database})
+
+
+@pytest.mark.parametrize("name", PROTECTED)
+def test_environment_cannot_select_protected_database(monkeypatch, name):
+    monkeypatch.setenv("TEST_DB_NAME", name)
+    database = test_settings.build_test_database()
+    with pytest.raises(ImproperlyConfigured, match="protegida"):
+        test_settings.validate_test_database({"default": database})
+
+
+@pytest.mark.parametrize("name", PROTECTED)
+def test_protected_databases_still_rejected_with_valid_credentials(monkeypatch, name):
+    monkeypatch.setenv("TEST_DB_NAME", name)
+    database = test_settings.build_test_database()
+    assert database["USER"] == VALID_USER
+    with pytest.raises(ImproperlyConfigured, match="protegida"):
+        test_settings.validate_test_database({"default": database})
+
+
+def test_environment_cannot_select_arbitrary_database(monkeypatch):
+    monkeypatch.setenv("TEST_DB_NAME", "otra_base")
+    database = test_settings.build_test_database()
+    with pytest.raises(ImproperlyConfigured, match="no autorizado"):
+        test_settings.validate_test_database({"default": database})
+
+
+def test_environment_rejects_unsafe_host(monkeypatch):
+    monkeypatch.setenv("TEST_DB_HOST", "db.example.com")
+    database = test_settings.build_test_database()
+    with pytest.raises(ImproperlyConfigured, match="host no autorizado"):
+        test_settings.validate_test_database({"default": database})
+
+
+def test_environment_rejects_development_port(monkeypatch):
+    monkeypatch.setenv("TEST_DB_PORT", "3306")
+    database = test_settings.build_test_database()
+    with pytest.raises(ImproperlyConfigured, match="puerto no autorizado"):
+        test_settings.validate_test_database({"default": database})
+
+
 def test_general_env_vars_cannot_change_the_destination(monkeypatch):
     monkeypatch.setenv("DB_NAME", "agrotech_db")
     monkeypatch.setenv("DB_ENGINE", "sqlite")
@@ -64,23 +169,50 @@ def test_general_env_vars_cannot_change_the_destination(monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "postgres://u:p@db.example.com:5432/agrotech_db")
     database = test_settings.build_test_database()
     assert database["ENGINE"] == "django.db.backends.mysql"
-    assert database["NAME"] == "agrotech_farms_test"
-    assert database["TEST"]["NAME"] == "agrotech_farms_test"
+    assert database["NAME"] == VALID_DB
+    assert database["TEST"]["NAME"] == VALID_DB
     assert database["HOST"] == "127.0.0.1"
     assert database["PORT"] == "3307"
+    test_settings.validate_test_database({"default": database})
 
 
-@pytest.mark.parametrize("protected", ["agrotech_db", "agrotech_t"])
+@pytest.mark.parametrize("protected", PROTECTED)
 def test_rejects_protected_database(protected):
-    default = {**_valid_default(), "NAME": protected, "TEST": {"NAME": protected}}
-    with pytest.raises(ImproperlyConfigured):
+    default = _valid_default(NAME=protected, TEST={"NAME": protected})
+    with pytest.raises(ImproperlyConfigured, match="protegida"):
         test_settings.validate_test_database({"default": default})
 
 
-@pytest.mark.parametrize("protected", ["agrotech_db", "agrotech_t"])
+@pytest.mark.parametrize("protected", PROTECTED)
 def test_rejects_protected_test_name(protected):
-    default = {**_valid_default(), "TEST": {"NAME": protected}}
-    with pytest.raises(ImproperlyConfigured):
+    default = _valid_default(TEST={"NAME": protected})
+    with pytest.raises(ImproperlyConfigured, match="protegida"):
+        test_settings.validate_test_database({"default": default})
+
+
+def test_rejects_database_outside_whitelist():
+    default = _valid_default(NAME="otra_base", TEST={"NAME": "otra_base"})
+    with pytest.raises(ImproperlyConfigured, match="no autorizado"):
+        test_settings.validate_test_database({"default": default})
+
+
+def test_rejects_test_name_outside_whitelist():
+    default = _valid_default(TEST={"NAME": "otra_base"})
+    with pytest.raises(ImproperlyConfigured, match="TEST.NAME no autorizado"):
+        test_settings.validate_test_database({"default": default})
+
+
+def test_rejects_test_name_diverging_from_name():
+    """TEST.NAME no puede desviarse ni ser diferente de NAME."""
+    default = _valid_default(NAME=VALID_DB, TEST={"NAME": "otra_base"})
+    with pytest.raises(ImproperlyConfigured, match="no puede desviarse"):
+        test_settings.validate_test_database({"default": default})
+
+
+def test_validate_test_database_rejects_unexpected_user():
+    """validate_test_database rechaza usuarios distintos del autorizado."""
+    default = _valid_default(USER="otro_usuario")
+    with pytest.raises(ImproperlyConfigured, match=VALID_USER):
         test_settings.validate_test_database({"default": default})
 
 
@@ -92,32 +224,29 @@ def test_rejects_missing_test_name():
 
 
 def test_rejects_wrong_port():
-    with pytest.raises(ImproperlyConfigured):
+    with pytest.raises(ImproperlyConfigured, match="puerto no autorizado"):
         test_settings.validate_test_database(
-            {
-                "default": {
-                    "ENGINE": "django.db.backends.mysql",
-                    "NAME": "agrotech_farms_test",
-                    "HOST": "127.0.0.1",
-                    "PORT": "3306",
-                    "TEST": {"NAME": "agrotech_farms_test"},
-                }
-            }
+            {"default": _valid_default(PORT="3306")}
         )
 
 
-def test_rejects_wrong_engine():
-    with pytest.raises(ImproperlyConfigured):
+def test_rejects_wrong_host():
+    with pytest.raises(ImproperlyConfigured, match="host no autorizado"):
         test_settings.validate_test_database(
-            {
-                "default": {
-                    "ENGINE": "django.db.backends.sqlite3",
-                    "NAME": "agrotech_farms_test",
-                    "HOST": "127.0.0.1",
-                    "PORT": "3307",
-                    "TEST": {"NAME": "agrotech_farms_test"},
-                }
-            }
+            {"default": _valid_default(HOST="db.example.com")}
+        )
+
+
+def test_accepts_loopback_host_alias():
+    test_settings.validate_test_database(
+        {"default": _valid_default(HOST="localhost")}
+    )
+
+
+def test_rejects_wrong_engine():
+    with pytest.raises(ImproperlyConfigured, match="motor inesperado"):
+        test_settings.validate_test_database(
+            {"default": _valid_default(ENGINE="django.db.backends.sqlite3")}
         )
 
 
@@ -152,17 +281,29 @@ def test_accepts_expected_environment():
 def test_expected_constants():
     assert test_settings.EXPECTED_SETTINGS_MODULE == "config.settings_test"
     assert test_settings.ALLOWED_DATABASE_ALIASES == ("default",)
-    assert test_settings.EXPECTED_TEST_DB_USER == "agrotech_test_user"
+    assert test_settings.EXPECTED_TEST_DB_USER == VALID_USER
+    assert test_settings.AUTHORIZED_TEST_DB_USERS == frozenset({VALID_USER})
+    assert test_settings.AUTHORIZED_TEST_DATABASES == frozenset({VALID_DB})
+    assert set(test_settings.PROTECTED_DATABASES) == set(PROTECTED)
+    assert test_settings.DEFAULT_TEST_DB_NAME == VALID_DB
+    assert test_settings.DEFAULT_TEST_DB_HOST == "127.0.0.1"
+    assert test_settings.DEFAULT_TEST_DB_PORT == "3307"
 
 
-def test_accepts_expected_test_user():
-    test_settings.validate_test_credentials(test_settings.EXPECTED_TEST_DB_USER)
+def test_accepts_expected_test_credentials():
+    test_settings.validate_test_credentials(
+        test_settings.EXPECTED_TEST_DB_USER, DUMMY_CREDENTIAL
+    )
 
 
-@pytest.mark.parametrize("user", [None, "", "root", "agrotech_farms_test"])
-def test_rejects_other_test_user(user):
-    with pytest.raises(ImproperlyConfigured, match="agrotech_test_user"):
-        test_settings.validate_test_credentials(user)
+def test_accepts_authorized_user_in_database_config():
+    test_settings.validate_test_database({"default": _valid_default(USER=VALID_USER)})
+
+
+@pytest.mark.parametrize("user", ["root", "agrotech_test_user", "otro"])
+def test_rejects_non_authorized_test_user(user):
+    with pytest.raises(ImproperlyConfigured, match=VALID_USER):
+        test_settings.validate_test_credentials(user, DUMMY_CREDENTIAL)
 
 
 class _FakeCursor:
@@ -189,14 +330,16 @@ class _FakeConnection:
     def __init__(
         self,
         *,
-        database="agrotech_farms_test",
-        current_user="agrotech_test_user",
+        name=VALID_DB,
+        database=VALID_DB,
+        current_user=VALID_USER,
         server_port=3307,
-        schema="agrotech_farms_test",
+        schema=VALID_DB,
     ):
         self.settings_dict = {
-            **_valid_default(),
+            **_valid_default(NAME=name, TEST={"NAME": name}),
             "USER": test_settings.EXPECTED_TEST_DB_USER,
+            "PASSWORD": DUMMY_CREDENTIAL,
         }
         schema_row = (schema,) if schema is not None else None
         self.cursor_obj = _FakeCursor(
@@ -270,7 +413,14 @@ def test_live_database_validation_rejects_missing_schema():
 def test_live_database_validation_rejects_wrong_configured_user_before_connecting():
     connection = _FakeConnection()
     connection.settings_dict["USER"] = "root"
-    with pytest.raises(ImproperlyConfigured, match="agrotech_test_user"):
+    with pytest.raises(ImproperlyConfigured, match=VALID_USER):
+        test_settings.validate_live_test_database(connection)
+    assert connection.cursor_obj.statements == []
+
+
+def test_live_database_validation_rejects_protected_name_before_connecting():
+    connection = _FakeConnection(name="agrotech_farms_test")
+    with pytest.raises(ImproperlyConfigured, match="protegida"):
         test_settings.validate_live_test_database(connection)
     assert connection.cursor_obj.statements == []
 
@@ -325,14 +475,14 @@ def test_db_setup_rejects_create_db(monkeypatch):
 def test_db_setup_requires_credentials(monkeypatch):
     monkeypatch.delenv("TEST_DB_USER", raising=False)
     monkeypatch.delenv("TEST_DB_PASSWORD", raising=False)
-    with pytest.raises(pytest.UsageError, match="TEST_DB_USER y TEST_DB_PASSWORD"):
+    with pytest.raises(pytest.UsageError, match="TEST_DB_USER"):
         _run_db_setup_guard()
 
 
 def test_db_setup_rejects_credentials_for_other_user(monkeypatch):
     monkeypatch.setenv("TEST_DB_USER", "root")
     monkeypatch.setenv("TEST_DB_PASSWORD", "test-password")
-    with pytest.raises(pytest.UsageError, match="agrotech_test_user"):
+    with pytest.raises(pytest.UsageError, match=VALID_USER):
         _run_db_setup_guard()
 
 

@@ -1,21 +1,27 @@
 """Guarda de seguridad para la ejecución de pruebas.
 
-Garantiza que pytest utilice exclusivamente ``config.settings_test`` y la base
-autorizada ``agrotech_farms_test``, abortando la sesión antes de que se abra
-una conexión o se aplique una migración.
+Garantiza que pytest utilice exclusivamente ``config.settings_test`` y una base
+de la lista blanca autorizada, abortando la sesión antes de que se abra una
+conexión o se aplique una migración.
 
 La configuración se valida en ``pytest_configure``. Las opciones del runner,
 las credenciales y la existencia real de la base se validan en
 ``pytest_fixture_setup``, antes de que pytest-django cree o reutilice la base.
 Así, las pruebas estáticas no necesitan credenciales ni conexión, mientras que
 cualquier prueba con acceso a base requiere ``--reuse-db``, prohíbe
-``--create-db`` y exige que ``agrotech_farms_test`` ya exista.
+``--create-db`` y exige que la base autorizada ya exista.
 """
 import os
 
 import pytest
 from django.conf import settings as django_settings
 from django.core.exceptions import ImproperlyConfigured
+
+def _validate_settings_environment(settings_module, databases: dict) -> None:
+    """Valida el módulo de settings activo y su configuración de base."""
+    from config.settings_test import validate_test_environment
+
+    validate_test_environment(settings_module, databases)
 
 
 def _verify_live_test_database(connection, db_blocker) -> None:
@@ -34,13 +40,12 @@ def pytest_configure(config: pytest.Config) -> None:
     """Aborta si la configuración efectiva no es la autorizada."""
     if not django_settings.configured:
         raise pytest.UsageError(
-            "Django no está configurado; las pruebas deben usar config.settings_test."
+            "Django no está configurado; las pruebas deben usar "
+            "config.settings_test."
         )
 
     try:
-        from config.settings_test import validate_test_environment
-
-        validate_test_environment(
+        _validate_settings_environment(
             django_settings.SETTINGS_MODULE,
             django_settings.DATABASES,
         )
@@ -68,16 +73,13 @@ def pytest_fixture_setup(fixturedef, request) -> None:
             "para impedir que pytest-django elimine o recree la base."
         )
 
-    if not os.environ.get("TEST_DB_USER") or not os.environ.get("TEST_DB_PASSWORD"):
-        raise pytest.UsageError(
-            "Ejecución bloqueada: TEST_DB_USER y TEST_DB_PASSWORD son "
-            "obligatorios para las pruebas con base."
-        )
-
     try:
         from config.settings_test import validate_test_credentials
 
-        validate_test_credentials(os.environ.get("TEST_DB_USER"))
+        validate_test_credentials(
+            os.environ.get("TEST_DB_USER"),
+            os.environ.get("TEST_DB_PASSWORD"),
+        )
     except (ImproperlyConfigured, ImportError) as exc:
         raise pytest.UsageError(
             f"Ejecución bloqueada: {exc}"
@@ -103,7 +105,7 @@ def pytest_fixture_setup(fixturedef, request) -> None:
     except Exception as exc:
         raise pytest.UsageError(
             "Ejecución bloqueada: no se pudo verificar en solo lectura que "
-            "agrotech_farms_test exista y sea accesible. No se creó ni modificó "
+            "la base autorizada exista y sea accesible. No se creó ni modificó "
             f"ninguna base ({type(exc).__name__})."
         ) from exc
     finally:
