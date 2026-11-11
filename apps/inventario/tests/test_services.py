@@ -518,7 +518,8 @@ def test_bulto_acepta_un_decimal_y_la_unidad_no(user):
         kind=MovementKind.ENTRADA,
         quantity=Decimal("1.5"),
     )
-    assert services.get_product(user=user, farm_id=farm_id, product_id=bulto.id).quantity == Decimal("1.500")
+    saved = services.get_product(user=user, farm_id=farm_id, product_id=bulto.id)
+    assert saved.quantity == Decimal("1.500")
     suelta = services.create_product(
         user=user,
         farm_id=farm_id,
