@@ -534,3 +534,29 @@ def test_bulto_acepta_un_decimal_y_la_unidad_no(user):
             kind=MovementKind.ENTRADA,
             quantity=Decimal("1.5"),
         )
+
+
+@pytest.mark.django_db
+def test_producto_borrado_sale_de_la_lista(user):
+    """Al borrar, el producto no se lista y el movimiento sigue guardado."""
+    from apps.inventario.models import Product
+
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    product = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Urea",
+        unit_code="kg",
+        category_code="fertilizante_abono",
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("2"),
+    )
+    services.delete_product(user=user, farm_id=farm_id, product_id=product.id)
+    assert list(services.list_products(user=user, farm_id=farm_id)) == []
+    assert Product.objects.filter(id=product.id, is_removed=True).exists()
+    assert services.list_movements(user=user, farm_id=farm_id, product_id=product.id).count() == 1
