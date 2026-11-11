@@ -498,3 +498,39 @@ def test_medida_nueva_no_se_borra_si_ya_se_usa(user):
     )
     with pytest.raises(AppError, match="se usa para contar"):
         delete_base_unit(user=user, farm_id=farm_id, code=base.code)
+
+
+@pytest.mark.django_db
+def test_bulto_acepta_un_decimal_y_la_unidad_no(user):
+    """El bulto admite un decimal. La unidad suelta, no."""
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    bulto = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Concentrado",
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=bulto.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("1.5"),
+    )
+    assert services.get_product(user=user, farm_id=farm_id, product_id=bulto.id).quantity == Decimal("1.500")
+    suelta = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Azadón",
+        unit_code="u",
+        category_code="herramienta_equipo",
+    )
+    with pytest.raises(AppError, match="cantidades enteras"):
+        services.register_movement(
+            user=user,
+            farm_id=farm_id,
+            product_id=suelta.id,
+            kind=MovementKind.ENTRADA,
+            quantity=Decimal("1.5"),
+        )
