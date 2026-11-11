@@ -560,3 +560,11 @@ def test_producto_borrado_sale_de_la_lista(user):
     assert list(services.list_products(user=user, farm_id=farm_id)) == []
     assert Product.objects.filter(id=product.id, is_removed=True).exists()
     assert services.list_movements(user=user, farm_id=farm_id, product_id=product.id).count() == 1
+
+
+def test_excel_de_inventario_es_un_libro():
+    """El reporte sale como libro de Excel."""
+    from apps.inventario.services.sheet import workbook
+
+    book = workbook(["Producto"], [["Urea"]])
+    assert book[:2] == b"PK"
