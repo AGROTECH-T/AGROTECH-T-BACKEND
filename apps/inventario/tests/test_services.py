@@ -568,3 +568,42 @@ def test_excel_de_inventario_es_un_libro():
 
     book = workbook(["Producto"], [["Urea"]])
     assert book[:2] == b"PK"
+
+
+@pytest.mark.django_db
+def test_foto_se_guarda_y_se_quita(user):
+    """La foto entra si pesa hasta 2 MB y se puede quitar."""
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from rest_framework.test import APIRequestFactory, force_authenticate
+
+    from apps.inventario.api.products.image_view import ProductImageView
+
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    product = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Concentrado",
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
+    )
+    factory = APIRequestFactory()
+    big = SimpleUploadedFile(
+        "foto.jpg",
+        b"x" * (2 * 1024 * 1024 + 1),
+        content_type="image/jpeg",
+    )
+    rejected = factory.post("/", {"image": big}, format="multipart")
+    force_authenticate(rejected, user=user)
+    with pytest.raises(AppError, match="2 MB"):
+        ProductImageView().post(rejected, farm_id=farm_id, product_id=product.id)
+
+    small = SimpleUploadedFile("foto.jpg", b"jpeg-bytes", content_type="image/jpeg")
+    accepted = factory.post("/", {"image": small}, format="multipart")
+    force_authenticate(accepted, user=user)
+    saved = ProductImageView().post(accepted, farm_id=farm_id, product_id=product.id)
+    assert saved.data["has_image"] is True
+
+    removed = factory.delete("/")
+    force_authenticate(removed, user=user)
+    cleared = ProductImageView().delete(removed, farm_id=farm_id, product_id=product.id)
+    assert cleared.data["has_image"] is False
