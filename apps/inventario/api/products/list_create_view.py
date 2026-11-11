@@ -27,6 +27,12 @@ class ProductListCreateView(APIView):
         products = product_services.list_products(
             user=request.user,
             farm_id=farm_id,
+            include_inactive=request.query_params.get("include_inactive") == "1",
+            category_code=request.query_params.get("category") or None,
+            low_stock_only=request.query_params.get("low_stock") == "1",
+            search=request.query_params.get("q") or None,
+            status=request.query_params.get("status") or None,
+            order=request.query_params.get("order") or "name",
         )
         return Response(ProductResponseSerializer(products, many=True).data)
 
