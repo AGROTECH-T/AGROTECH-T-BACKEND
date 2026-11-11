@@ -587,6 +587,7 @@ def test_foto_se_guarda_y_se_quita(user):
         unit_code="bulto_40kg",
         category_code="alimento_concentrado",
     )
+    view = ProductImageView.as_view()
     factory = APIRequestFactory()
     big = SimpleUploadedFile(
         "foto.jpg",
@@ -595,16 +596,19 @@ def test_foto_se_guarda_y_se_quita(user):
     )
     rejected = factory.post("/", {"image": big}, format="multipart")
     force_authenticate(rejected, user=user)
-    with pytest.raises(AppError, match="2 MB"):
-        ProductImageView().post(rejected, farm_id=farm_id, product_id=product.id)
+    too_big = view(rejected, farm_id=farm_id, product_id=product.id)
+    assert too_big.status_code == 400
+    assert "2 MB" in too_big.data["error"]
 
     small = SimpleUploadedFile("foto.jpg", b"jpeg-bytes", content_type="image/jpeg")
     accepted = factory.post("/", {"image": small}, format="multipart")
     force_authenticate(accepted, user=user)
-    saved = ProductImageView().post(accepted, farm_id=farm_id, product_id=product.id)
+    saved = view(accepted, farm_id=farm_id, product_id=product.id)
+    assert saved.status_code == 200
     assert saved.data["has_image"] is True
 
     removed = factory.delete("/")
     force_authenticate(removed, user=user)
-    cleared = ProductImageView().delete(removed, farm_id=farm_id, product_id=product.id)
+    cleared = view(removed, farm_id=farm_id, product_id=product.id)
+    assert cleared.status_code == 200
     assert cleared.data["has_image"] is False

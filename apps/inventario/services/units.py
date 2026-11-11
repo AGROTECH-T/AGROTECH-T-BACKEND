@@ -218,7 +218,8 @@ def _active_unit(code: str) -> InventoryUnit:
 def build_unit_code(stem: str, factor: Decimal, base_symbol: str) -> str:
     """Arma el código interno: bulto_50kg, caneca_20l."""
     factor_part = _format_factor(factor)
-    symbol = _slug_stem(base_symbol.replace("³", "3").replace("²", "2"))
+    prepared = base_symbol.replace("³", "3").replace("²", "2").replace("@", "at")
+    symbol = _slug_stem(prepared)
     return f"{stem}_{factor_part}{symbol}"
 
 

@@ -131,6 +131,7 @@ def create_product(
         raise AppError("unidad no válida", 400)
     if not CategoryUnit.objects.filter(category=category, unit=unit).exists():
         raise AppError("unidad no válida para esta categoría", 400)
+    _reject_duplicate_barcode(farm_id=membership.farm_id, barcode=clean_barcode)
 
     try:
         return Product.objects.create(
@@ -192,6 +193,11 @@ def update_product(
         category=product.category, unit=product.unit
     ).exists():
         raise AppError("unidad no válida para esta categoría", 400)
+    _reject_duplicate_barcode(
+        farm_id=farm_id,
+        barcode=product.barcode,
+        product_id=product.id,
+    )
 
     try:
         product.save()
@@ -249,6 +255,22 @@ def _apply_order(queryset: QuerySet[Product], order: str) -> QuerySet[Product]:
     if order == "last_movement":
         return queryset.order_by("-last_movement_at", "name", "id")
     return queryset.order_by("name", "id")
+
+
+def _reject_duplicate_barcode(
+    *,
+    farm_id: int,
+    barcode: str,
+    product_id: int | None = None,
+) -> None:
+    """Rechaza un código ya usado en la finca, aunque la base no lo impida."""
+    if not barcode:
+        return
+    taken = Product.objects.filter(farm_id=farm_id, barcode=barcode)
+    if product_id is not None:
+        taken = taken.exclude(id=product_id)
+    if taken.exists():
+        raise AppError("ese código de barras ya existe en la finca", 409)
 
 
 def _optional_barcode(value: str) -> str:
