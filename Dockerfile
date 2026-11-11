@@ -19,6 +19,5 @@ CMD ["pytest"]
 FROM base AS production
 COPY . .
 RUN chown -R app:app /app
-USER app
 EXPOSE 8080
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}"]
+CMD ["sh", "-c", "mkdir -p /app/media && chown app:app /app/media && su -s /bin/sh app -c 'python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}'"]

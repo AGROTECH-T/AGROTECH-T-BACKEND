@@ -14,6 +14,8 @@ from config import platform
 from config.database import database
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
