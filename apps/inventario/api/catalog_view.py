@@ -12,8 +12,9 @@ from apps.inventario.catalog import catalog_payload
 
 
 class InventoryCatalogView(APIView):
-    """Devuelve el catálogo fijo del sistema."""
+    """Devuelve el catálogo activo del sistema."""
 
     @extend_schema(tags=["inventario"])
     def get(self, request: Request) -> Response:
-        return Response(catalog_payload())
+        category = request.query_params.get("category") or None
+        return Response(catalog_payload(category_code=category))
