@@ -5,6 +5,7 @@ Propósito: crear cuentas reales y autenticar con el endpoint existente.
 Contexto: la API usa JWE y APIClient, igual que las pruebas de cuentas.
 """
 import base64
+import secrets
 
 import pytest
 from django.contrib.auth.hashers import make_password
@@ -17,11 +18,17 @@ VALID_PASSWORD = "Secure1!"
 
 
 @pytest.fixture(autouse=True)
-def token_key(monkeypatch):
-    """Configura claves deterministas exclusivamente para pruebas."""
+def token_key(monkeypatch, settings):
+    """Configura claves deterministas exclusivamente para pruebas.
+
+    F10.3.2: crear, reenviar y cambiar el rol generan códigos, que exigen
+    INVITATION_CODE_HMAC_KEY. Se usa una clave ficticia generada en cada prueba,
+    que no se guarda en ningún archivo.
+    """
     cache.clear()
     monkeypatch.setenv("JWT_ENCRYPTION_KEY", base64.b64encode(b"k" * 32).decode())
     monkeypatch.setenv("OTP_HMAC_KEY", "test-otp-key")
+    settings.INVITATION_CODE_HMAC_KEY = secrets.token_urlsafe(48)
     yield
     cache.clear()
 
@@ -44,6 +51,11 @@ def make_user(db):
             phone=kwargs.pop("phone", "3001234567"),
             correo=kwargs.pop("correo", f"{identification}@example.com"),
             password_hash=make_password(VALID_PASSWORD),
+            # Las fixtures crean fincas libremente; las pruebas de F6 piden
+            # can_create_farms=False de forma explícita.
+            can_create_farms=kwargs.pop("can_create_farms", True),
+            # F10.2: crear fincas exige correo verificado en el servicio.
+            email_verified=kwargs.pop("email_verified", True),
             **kwargs,
         )
 

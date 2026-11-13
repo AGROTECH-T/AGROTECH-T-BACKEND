@@ -80,12 +80,25 @@ def test_update_farm_changes_name(user):
     assert updated.farm.name == "Nuevo"
 
 
-def test_delete_farm_removes_memberships(user):
-    """Al eliminar la finca también se borran las membresías."""
+def test_deactivate_farm_keeps_memberships(user):
+    """La baja lógica conserva la finca y sus membresías."""
+    membership = services.create_farm(user=user, name="Temporal")
+    farm_id = membership.farm_id
+
+    services.deactivate_farm(user=user, farm_id=farm_id)
+
+    farm = Farm.objects.get(pk=farm_id)
+    assert farm.is_active is False
+    assert farm.deactivated_at is not None
+    assert farm.deactivated_by == user
+    assert FarmMembership.objects.filter(farm_id=farm_id).exists()
+
+
+def test_delete_farm_alias_uses_deactivation(user):
+    """El nombre histórico del servicio también aplica baja lógica."""
     membership = services.create_farm(user=user, name="Temporal")
     farm_id = membership.farm_id
 
     services.delete_farm(user=user, farm_id=farm_id)
 
-    assert not Farm.objects.filter(pk=farm_id).exists()
-    assert not FarmMembership.objects.filter(farm_id=farm_id).exists()
+    assert Farm.objects.get(pk=farm_id).is_active is False

@@ -7,12 +7,17 @@ Contexto: las restricciones de base de datos se comprueban sin validación previ
 import pytest
 from django.db import IntegrityError, transaction
 
-from apps.farms.models import Farm, FarmMembership, FarmRole
+from apps.farms.models import Farm, FarmMembership, FarmRole, MembershipStatus
 
 
 def test_role_catalog_is_exact():
     """El catálogo contiene únicamente los tres roles aprobados."""
     assert FarmRole.values == ["administrador", "operador", "consulta"]
+
+
+def test_status_catalog_is_exact():
+    """El catálogo de estados contiene únicamente los tres estados aprobados."""
+    assert MembershipStatus.values == ["active", "revoked", "left"]
 
 
 @pytest.mark.django_db
@@ -22,6 +27,9 @@ def test_farm_is_created_with_minimal_fields():
 
     assert farm.pk is not None
     assert farm.name == "La Esperanza"
+    assert farm.is_active is True
+    assert farm.deactivated_at is None
+    assert farm.deactivated_by is None
     assert farm.created_at is not None
     assert farm.updated_at is not None
 
@@ -76,6 +84,23 @@ def test_duplicate_membership_is_rejected(user):
                 user=user,
                 role=FarmRole.OPERADOR,
             )
+
+
+@pytest.mark.django_db
+def test_membership_defaults_to_active(user):
+    """Una membresía nueva nace activa y sin marcadores de ciclo de vida."""
+    farm = Farm.objects.create(name="La Esperanza")
+    membership = FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    assert membership.status == MembershipStatus.ACTIVE
+    assert membership.revoked_at is None
+    assert membership.revoked_by is None
+    assert membership.left_at is None
+    assert membership.updated_at is not None
 
 
 @pytest.mark.django_db

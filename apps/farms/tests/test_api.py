@@ -33,12 +33,17 @@ def test_create_farm_assigns_admin_membership(auth_client, user):
         "role",
         "created_at",
         "updated_at",
+        "is_active",
+        "deactivated_at",
+        "capabilities",
     }
     assert response.data["id"] == farm.pk
     assert response.data["name"] == "La Esperanza"
     assert response.data["role"] == "administrador"
     assert response.data["created_at"] is not None
     assert response.data["updated_at"] is not None
+    assert response.data["is_active"] is True
+    assert response.data["deactivated_at"] is None
 
 
 @pytest.mark.parametrize(
@@ -326,8 +331,8 @@ def test_non_admin_cannot_update_farm(login, make_user):
     assert farm.name == "La Esperanza"
 
 
-def test_admin_can_delete_farm(auth_client, user):
-    """El administrador elimina la finca y sus membresías."""
+def test_admin_deactivates_farm_without_deleting_it(auth_client, user):
+    """El administrador desactiva la finca y conserva sus relaciones."""
     farm = Farm.objects.create(name="La Esperanza")
     FarmMembership.objects.create(
         farm=farm,
@@ -338,8 +343,102 @@ def test_admin_can_delete_farm(auth_client, user):
     response = auth_client.delete(f"/api/v1/farms/{farm.pk}/")
 
     assert response.status_code == 204
-    assert not Farm.objects.filter(pk=farm.pk).exists()
-    assert not FarmMembership.objects.filter(farm_id=farm.pk).exists()
+    farm.refresh_from_db()
+    assert farm.is_active is False
+    assert farm.deactivated_at is not None
+    assert farm.deactivated_by == user
+    assert Farm.objects.filter(pk=farm.pk).exists()
+    assert FarmMembership.objects.filter(farm_id=farm.pk).exists()
+
+
+def test_repeated_deactivation_is_idempotent(auth_client, user):
+    """Una segunda baja no cambia el responsable ni la fecha original."""
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    assert auth_client.delete(f"/api/v1/farms/{farm.pk}/").status_code == 204
+    farm.refresh_from_db()
+    first_deactivated_at = farm.deactivated_at
+
+    assert auth_client.delete(f"/api/v1/farms/{farm.pk}/").status_code == 204
+
+    farm.refresh_from_db()
+    assert farm.deactivated_at == first_deactivated_at
+    assert farm.deactivated_by == user
+
+
+def test_deactivated_farm_is_not_listed(auth_client, user):
+    """Las fincas desactivadas no aparecen en el listado operativo."""
+    active = Farm.objects.create(name="Activa")
+    inactive = Farm.objects.create(name="Inactiva", is_active=False)
+    FarmMembership.objects.create(
+        farm=active,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+    FarmMembership.objects.create(
+        farm=inactive,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+
+    response = auth_client.get("/api/v1/farms/")
+
+    assert response.status_code == 200
+    assert [row["id"] for row in response.data] == [active.pk]
+
+
+def test_admin_can_read_deactivated_farm_but_operator_cannot(
+    login,
+    make_user,
+):
+    """El detalle de una finca inactiva queda reservado al administrador."""
+    admin = make_user("11111111")
+    operator = make_user("22222222")
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=admin,
+        role=FarmRole.ADMINISTRADOR,
+    )
+    FarmMembership.objects.create(
+        farm=farm,
+        user=operator,
+        role=FarmRole.OPERADOR,
+    )
+    services.deactivate_farm(user=admin, farm_id=farm.pk)
+
+    admin_response = login(admin).get(f"/api/v1/farms/{farm.pk}/")
+    operator_response = login(operator).get(f"/api/v1/farms/{farm.pk}/")
+
+    assert admin_response.status_code == 200
+    assert admin_response.data["id"] == farm.pk
+    assert operator_response.status_code == 404
+
+
+def test_deactivated_farm_blocks_update(auth_client, user):
+    """Una finca desactivada no admite cambios ordinarios."""
+    farm = Farm.objects.create(name="La Esperanza")
+    FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.ADMINISTRADOR,
+    )
+    services.deactivate_farm(user=user, farm_id=farm.pk)
+
+    response = auth_client.put(
+        f"/api/v1/farms/{farm.pk}/",
+        {"name": "Nombre nuevo"},
+        format="json",
+    )
+
+    assert response.status_code == 404
+    farm.refresh_from_db()
+    assert farm.name == "La Esperanza"
 
 
 def test_non_admin_cannot_delete_farm(login, make_user):
@@ -361,6 +460,8 @@ def test_non_admin_cannot_delete_farm(login, make_user):
     response = login(viewer).delete(f"/api/v1/farms/{farm.pk}/")
 
     assert response.status_code == 403
+    farm.refresh_from_db()
+    assert farm.is_active is True
     assert Farm.objects.filter(pk=farm.pk).exists()
 
 
