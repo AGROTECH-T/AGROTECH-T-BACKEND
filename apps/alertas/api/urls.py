@@ -5,6 +5,10 @@ Prefijo: /api/v1/
 """
 from django.urls import path
 
+from apps.alertas.api.views import AlertListView
+
 app_name = "alertas"
 
-urlpatterns = []
+urlpatterns = [
+    path("alerts/", AlertListView.as_view(), name="alert-list"),
+]

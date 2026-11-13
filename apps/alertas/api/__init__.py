@@ -1,1 +1,4 @@
-"""API de avisos de stock."""
+"""API de alertas.
+
+@author Cristian Deysdayr Jimenez
+"""
