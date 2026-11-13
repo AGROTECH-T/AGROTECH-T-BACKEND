@@ -7,11 +7,17 @@ Contexto: esa cuenta solo nombra administradores; no abre fincas.
 import pytest
 from django.contrib.auth.hashers import check_password
 from django.core.management import call_command
-from django.core.management.base import CommandError
 from rest_framework.serializers import ValidationError
 
 from apps.accounts.models import User
-from apps.accounts.super_admin_seed import SeedSuperAdminError, _texto, seed_super_admin
+from apps.accounts.seeders import USUARIOS_INICIALES
+from apps.accounts.super_admin_seed import (
+    SeedSuperAdminError,
+    _texto,
+    seed_super_admin,
+    seed_usuario,
+    seed_usuarios_iniciales,
+)
 from apps.farms.models import Farm, FarmMembership
 
 CLAVE = "Secure1!"
@@ -93,16 +99,44 @@ def test_identificacion_invalida_se_rechaza():
 
 
 @pytest.mark.django_db
-def test_comando_usa_entorno_cuando_faltan_argumentos(monkeypatch):
-    """El manage.py toma documento y clave de las variables de entorno."""
-    monkeypatch.setenv("SEED_SUPERADMIN_IDENTIFICATION", "33333333")
-    monkeypatch.setenv("SEED_SUPERADMIN_PASSWORD", CLAVE)
+def test_comando_siembra_usuarios_del_archivo():
+    """El arranque crea las cuentas definidas en seeders.py."""
+    inicial = USUARIOS_INICIALES[0]
 
-    call_command("seed_super_admin")
+    call_command("seed_usuarios")
 
-    user = User.objects.get(identification="33333333")
+    user = User.objects.get(identification=inicial["identification"])
     assert user.is_superadmin is True
     assert user.is_administrador is False
+    assert user.first_name == inicial["first_name"]
+    assert check_password(inicial["password"], user.password_hash)
+
+
+@pytest.mark.django_db
+def test_seeders_repite_sin_duplicar():
+    """Volver a sembrar el archivo no crea otra cuenta."""
+    seed_usuarios_iniciales()
+    seed_usuarios_iniciales()
+
+    assert User.objects.filter(
+        identification=USUARIOS_INICIALES[0]["identification"]
+    ).count() == 1
+
+
+@pytest.mark.django_db
+def test_seed_usuario_respeta_rol_de_administrador():
+    """Una fila del seeder puede dejar administrador sin ser superadmin."""
+    user = seed_usuario(
+        identification="55555555",
+        password=CLAVE,
+        first_name="Ana",
+        last_name="Perez",
+        is_superadmin=False,
+        is_administrador=True,
+    )
+
+    assert user.is_superadmin is False
+    assert user.is_administrador is True
 
 
 def test_mensaje_de_validacion_en_diccionario():
@@ -113,7 +147,10 @@ def test_mensaje_de_validacion_en_diccionario():
 
 
 @pytest.mark.django_db
-def test_comando_sin_clave_en_cuenta_nueva_falla():
-    """El comando corta con error si no hay clave para una cuenta nueva."""
-    with pytest.raises(CommandError, match="contraseña es obligatoria"):
-        call_command("seed_super_admin", identification="44444444")
+def test_comando_viejo_delega_al_archivo():
+    """seed_super_admin sigue sembrando las cuentas del archivo."""
+    call_command("seed_super_admin")
+
+    assert User.objects.filter(
+        identification=USUARIOS_INICIALES[0]["identification"]
+    ).exists()
