@@ -1,0 +1,39 @@
+name: ${DISPOSABLE_PROJECT_NAME:?define DISPOSABLE_PROJECT_NAME}
+
+services:
+  mariadb:
+    image: mariadb:11.8.8
+    container_name: ${DISPOSABLE_CONTAINER_NAME:?define DISPOSABLE_CONTAINER_NAME}
+    hostname: ${DISPOSABLE_CONTAINER_HOSTNAME:?define DISPOSABLE_CONTAINER_HOSTNAME}
+    environment:
+      MARIADB_DATABASE: ${DISPOSABLE_DB_NAME:?define DISPOSABLE_DB_NAME}
+      MARIADB_USER: ${DISPOSABLE_DB_USER:?define DISPOSABLE_DB_USER}
+      MARIADB_PASSWORD: ${DISPOSABLE_DB_PASSWORD:?define DISPOSABLE_DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DISPOSABLE_ROOT_PASSWORD:?define DISPOSABLE_ROOT_PASSWORD}
+      MARIADB_ROOT_HOST: localhost
+    ports:
+      - "127.0.0.1:3317:3306"
+    tmpfs:
+      - /var/lib/mysql:rw,noexec,nosuid,size=2g
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 20s
+    restart: "no"
+    init: true
+    labels:
+      agrotech.disposable: "true"
+      agrotech.run-id: ${DISPOSABLE_RUN_ID:?define DISPOSABLE_RUN_ID}
+      agrotech.purpose: permissions-validation
+    networks:
+      - disposable
+
+networks:
+  disposable:
+    name: ${DISPOSABLE_NETWORK_NAME:?define DISPOSABLE_NETWORK_NAME}
+    labels:
+      agrotech.disposable: "true"
+      agrotech.run-id: ${DISPOSABLE_RUN_ID:?define DISPOSABLE_RUN_ID}
+      agrotech.purpose: permissions-validation

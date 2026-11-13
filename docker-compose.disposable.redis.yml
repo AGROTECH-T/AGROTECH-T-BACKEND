@@ -1,0 +1,45 @@
+# Redis desechable del orquestador (F10.3.4-A).
+#
+# Solo lo carga tools/run_permissions_disposable.ps1 con -WithRedis, como
+# segundo -f junto a docker-compose.disposable.yml (mismo proyecto y misma
+# red). El override generado fija la imagen por digest y añade las etiquetas
+# de propiedad de la invocación. Sin persistencia: datos en tmpfs, sin RDB ni
+# AOF. Contraseña aleatoria por ejecución; el puerto solo se publica en
+# loopback. Base 0: caché de Django; base 1: marca de identidad de la ejecución.
+services:
+  redis:
+    image: redis:7.4.12
+    container_name: ${DISPOSABLE_REDIS_CONTAINER_NAME:?define DISPOSABLE_REDIS_CONTAINER_NAME}
+    hostname: ${DISPOSABLE_REDIS_CONTAINER_HOSTNAME:?define DISPOSABLE_REDIS_CONTAINER_HOSTNAME}
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --requirepass
+      - ${DISPOSABLE_REDIS_PASSWORD:?define DISPOSABLE_REDIS_PASSWORD}
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --databases
+      - "2"
+    environment:
+      REDISCLI_AUTH: ${DISPOSABLE_REDIS_PASSWORD:?define DISPOSABLE_REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:16379:6379"
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h 127.0.0.1 ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 2s
+    restart: "no"
+    init: true
+    labels:
+      agrotech.disposable: "true"
+      agrotech.run-id: ${DISPOSABLE_RUN_ID:?define DISPOSABLE_RUN_ID}
+      agrotech.purpose: permissions-validation
+    networks:
+      - disposable
