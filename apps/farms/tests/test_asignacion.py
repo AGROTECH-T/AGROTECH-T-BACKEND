@@ -3,18 +3,30 @@
 
 """
 import pytest
+
 from apps.farms.models import Farm, FarmMembership, FarmRole
+
 LISTA = "/api/v1/configuracion/usuarios/"
+
+
 def _rol(user_id: int) -> str:
     return f"/api/v1/configuracion/usuarios/{user_id}/rol/"
+
+
 def _finca(name: str) -> Farm:
     return Farm.objects.create(name=name)
+
+
 def _miembro(farm: Farm, user, role: str) -> FarmMembership:
     return FarmMembership.objects.create(farm=farm, user=user, role=role)
+
+
 @pytest.mark.django_db
 def test_lista_exige_sesion(client):
     """Sin token no se ven las personas."""
     assert client.get(LISTA).status_code == 401
+
+
 @pytest.mark.django_db
 def test_administrador_ve_solo_sus_fincas(make_user, login):
     """El listado incluye las fincas administradas y omite las ajenas."""
@@ -33,6 +45,8 @@ def test_administrador_ve_solo_sus_fincas(make_user, login):
     assert data["puedo_asignar"] is True
     assert nombres == ["Ada Admin", "Omar Operador"]
     assert data["usuarios"][0]["es_yo"] is True
+
+
 @pytest.mark.django_db
 def test_operador_no_asigna(make_user, login):
     """Quien no administra ninguna finca no recibe personas."""
@@ -42,6 +56,8 @@ def test_operador_no_asigna(make_user, login):
     data = login(operador).get(LISTA).json()
 
     assert data == {"puedo_asignar": False, "fincas": [], "usuarios": []}
+
+
 @pytest.mark.django_db
 def test_administrador_cambia_el_rol(make_user, login):
     """El administrador reemplaza el rol de otra persona en su finca."""
@@ -59,6 +75,8 @@ def test_administrador_cambia_el_rol(make_user, login):
 
     assert response.status_code == 200
     assert response.json()["membresias"][0]["role"] == FarmRole.CONSULTA
+
+
 @pytest.mark.django_db
 def test_no_cambia_su_propio_rol(make_user, login):
     """La sesión no puede modificarse a sí misma."""
@@ -76,6 +94,8 @@ def test_no_cambia_su_propio_rol(make_user, login):
 
     assert response.status_code == 403
     assert response.json()["error"] == "no puedes cambiar tu propio rol"
+
+
 @pytest.mark.django_db
 def test_conserva_un_administrador(make_user, login):
     """Cambiar a otro administrador deja la finca con uno activo."""
@@ -99,6 +119,8 @@ def test_conserva_un_administrador(make_user, login):
         ).count()
         == 1
     )
+
+
 @pytest.mark.django_db
 def test_no_cambia_una_finca_ajena(make_user, login):
     """Administrar una finca no autoriza a cambiar otra."""
@@ -116,8 +138,16 @@ def test_no_cambia_una_finca_ajena(make_user, login):
     )
 
     assert response.status_code == 404
+
+
 def _permisos(user_id: int) -> str:
     return f"/api/v1/configuracion/usuarios/{user_id}/permisos/"
+
+
+def _estado(user_id: int) -> str:
+    return f"/api/v1/configuracion/usuarios/{user_id}/estado/"
+
+
 def _alta() -> dict:
     return {
         "first_name": "Luz",
@@ -127,6 +157,8 @@ def _alta() -> dict:
         "password": "Secure1!",
         "role": FarmRole.OPERADOR,
     }
+
+
 @pytest.mark.django_db
 def test_crea_persona_con_rol_en_la_finca(make_user, login):
     """El alta deja a la persona con el rol elegido en esa finca."""
@@ -141,6 +173,8 @@ def test_crea_persona_con_rol_en_la_finca(make_user, login):
     assert body["nombre"] == "Luz Rojas"
     assert body["membresias"][0]["role"] == FarmRole.OPERADOR
     assert body["membresias"][0]["farm_id"] == finca.id
+
+
 @pytest.mark.django_db
 def test_no_crea_persona_con_documento_repetido(make_user, login):
     """El mismo documento no se registra dos veces."""
@@ -152,6 +186,8 @@ def test_no_crea_persona_con_documento_repetido(make_user, login):
     response = login(admin).post(LISTA, {**_alta(), "farm_id": finca.id}, format="json")
 
     assert response.status_code == 409
+
+
 @pytest.mark.django_db
 def test_ve_el_detalle_de_una_persona(make_user, login):
     """La ficha trae el rol y si la cuenta está activa."""
@@ -166,6 +202,8 @@ def test_ve_el_detalle_de_una_persona(make_user, login):
     assert response.status_code == 200
     assert response.json()["activo"] is True
     assert response.json()["membresias"][0]["role"] == FarmRole.CONSULTA
+
+
 @pytest.mark.django_db
 def test_suma_y_quita_permiso_directo(make_user, login):
     """El permiso extra se agrega y después se puede retirar."""
@@ -191,6 +229,8 @@ def test_suma_y_quita_permiso_directo(make_user, login):
     )
     assert removed.status_code == 200
     assert not FarmPermission.objects.filter(membership=operador, permission=AJUSTAR_STOCK).exists()
+
+
 @pytest.mark.django_db
 def test_no_suma_un_permiso_que_el_rol_ya_trae(make_user, login):
     """No se guarda un extra que el rol ya concede."""
@@ -208,3 +248,33 @@ def test_no_suma_un_permiso_que_el_rol_ya_trae(make_user, login):
         format="json",
     )
     assert response.status_code == 400
+
+
+@pytest.mark.django_db
+def test_inactiva_y_reactiva_una_cuenta(make_user, login):
+    """Inactivar deja activo en falso; reactivar lo vuelve verdadero."""
+    admin = make_user("11000051", first_name="Ada", last_name="Admin")
+    persona = make_user("11000052", first_name="Luis", last_name="Campo")
+    finca = _finca("El lago")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+    _miembro(finca, persona, FarmRole.OPERADOR)
+    client = login(admin)
+
+    off = client.put(_estado(persona.id), {"activo": False}, format="json")
+    assert off.status_code == 200
+    assert off.json()["activo"] is False
+
+    on = client.put(_estado(persona.id), {"activo": True}, format="json")
+    assert on.status_code == 200
+    assert on.json()["activo"] is True
+
+
+@pytest.mark.django_db
+def test_no_inactiva_su_propia_cuenta(make_user, login):
+    """La sesión no se apaga a sí misma."""
+    admin = make_user("11000061", first_name="Ada", last_name="Admin")
+    finca = _finca("El lago")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+
+    response = login(admin).put(_estado(admin.id), {"activo": False}, format="json")
+    assert response.status_code == 403

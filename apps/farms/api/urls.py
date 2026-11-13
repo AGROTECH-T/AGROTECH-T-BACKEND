@@ -1,17 +1,18 @@
-"""Rutas del submodulo de Configuracion.
+"""Rutas del submódulo de Configuración.
 
-Proposito: publicar el catalogo de roles y la asignacion de permisos bajo /api/v1/.
+Propósito: publicar el catálogo de roles y la asignación de permisos bajo /api/v1/.
 @author Cristian Deysdayr Jimenez
 """
 
 from django.urls import path
 
 from apps.farms.api.views import (
-    RolesPermisosView,
     AsignacionRolesView,
-    DetalleUsuarioView,
     CambiarRolView,
+    DetalleUsuarioView,
+    EstadoUsuarioView,
     PermisoDirectoView,
+    RolesPermisosView,
 )
 
 urlpatterns = [
@@ -39,5 +40,10 @@ urlpatterns = [
         "configuracion/usuarios/<int:user_id>/permisos/",
         PermisoDirectoView.as_view(),
         name="configuracion-permisos-directos",
+    ),
+    path(
+        "configuracion/usuarios/<int:user_id>/estado/",
+        EstadoUsuarioView.as_view(),
+        name="configuracion-estado-usuario",
     ),
 ]
