@@ -1,17 +1,15 @@
-"""Primera mitad de la matriz de permisos Farms.
+"""Mitad administrativa de la matriz de permisos.
 
-Propósito: acciones administrativas y de membresía.
-Contexto: catálogo funcional de Configuración.
+Propósito: describir lo que cada rol puede hacer en fincas, integrantes y
+configuración, tal como lo valida el backend.
+Contexto: el catálogo es de lectura; el rol se guarda en la membresía.
 """
 
 from apps.farms.role_actors import (
     ADMINISTRADOR,
-    CONDICIONADO,
     CONSULTA,
     NO_PERMITIDO,
-    NO_REQUIERE,
     OPERADOR,
-    PENDIENTE,
     PERMITIDO,
 )
 
@@ -19,100 +17,76 @@ PERMISOS_ADMIN = (
     {
         "id": "crear_finca",
         "nombre": "Crear una finca",
+        "modulo": "Fincas",
         "por_rol": {
             ADMINISTRADOR: {
                 "estado": PERMITIDO,
-                "detalle": "Con cuenta registrada y correo verificado.",
+                "detalle": "Cualquier cuenta registrada; quien la crea queda como administrador.",
             },
-            OPERADOR: {"estado": NO_REQUIERE, "detalle": "No requiere rol de finca para crearla."},
-            CONSULTA: {"estado": NO_REQUIERE, "detalle": "No requiere rol de finca para crearla."},
+            OPERADOR: {
+                "estado": PERMITIDO,
+                "detalle": "No depende del rol; el creador queda como administrador.",
+            },
+            CONSULTA: {
+                "estado": PERMITIDO,
+                "detalle": "No depende del rol; el creador queda como administrador.",
+            },
         },
     },
     {
         "id": "consultar_fincas",
-        "nombre": "Consultar fincas propias",
+        "nombre": "Consultar sus fincas",
+        "modulo": "Fincas",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Con membresía activa."},
-            OPERADOR: {"estado": PERMITIDO, "detalle": "Con membresía activa."},
-            CONSULTA: {"estado": PERMITIDO, "detalle": "Con membresía activa."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Solo las fincas con membresía."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Solo las fincas con membresía."},
+            CONSULTA: {"estado": PERMITIDO, "detalle": "Solo las fincas con membresía."},
         },
     },
     {
-        "id": "consultar_datos_generales",
-        "nombre": "Consultar datos generales",
+        "id": "editar_finca",
+        "nombre": "Corregir los datos de la finca",
+        "modulo": "Fincas",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Datos generales de la finca."},
-            OPERADOR: {"estado": PENDIENTE, "detalle": "Pendiente de delimitar."},
-            CONSULTA: {"estado": CONDICIONADO, "detalle": "Solo información autorizada."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Nombre de la finca."},
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
         },
     },
     {
-        "id": "editar_datos_generales",
-        "nombre": "Editar nombre y ubicación",
+        "id": "eliminar_finca",
+        "nombre": "Eliminar la finca",
+        "modulo": "Fincas",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Datos generales de la finca."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Borra también sus membresías."},
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
         },
     },
     {
-        "id": "administrar_integrantes",
-        "nombre": "Administrar integrantes",
+        "id": "consultar_personas",
+        "nombre": "Consultar las personas de la finca",
+        "modulo": "Configuración",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Integrantes de su finca."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "gestionar_invitaciones",
-        "nombre": "Crear o cancelar invitaciones",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Invitaciones de su finca."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {
+                "estado": PERMITIDO,
+                "detalle": "Personas de las fincas que administra.",
+            },
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "La API responde sin personas."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "La API responde sin personas."},
         },
     },
     {
         "id": "cambiar_roles",
-        "nombre": "Cambiar roles",
+        "nombre": "Cambiar el rol de una persona",
+        "modulo": "Configuración",
         "por_rol": {
             ADMINISTRADOR: {
                 "estado": PERMITIDO,
-                "detalle": "Respetando el último administrador activo.",
+                "detalle": "Solo en fincas que administra y conservando un administrador activo.",
             },
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "retirar_integrantes",
-        "nombre": "Retirar integrantes",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Con restricciones."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "cambiar_estado_finca",
-        "nombre": "Cambiar el estado de la finca",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Sujeto a restricciones."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "reactivar_finca",
-        "nombre": "Reactivar una finca",
-        "por_rol": {
-            ADMINISTRADOR: {
-                "estado": CONDICIONADO,
-                "detalle": "Si cumple las condiciones y confirma la acción.",
-            },
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador de la finca."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador de la finca."},
         },
     },
 )

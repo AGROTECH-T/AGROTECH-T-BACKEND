@@ -7,7 +7,7 @@ Contexto: las restricciones de base de datos se comprueban sin validación previ
 import pytest
 from django.db import IntegrityError, transaction
 
-from apps.farms.models import Farm, FarmMembership, FarmRole
+from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole
 
 
 def test_role_catalog_is_exact():
@@ -90,3 +90,19 @@ def test_invalid_role_is_rejected_by_database(user):
                 user=user,
                 role="propietario",
             )
+
+
+@pytest.mark.django_db
+def test_permiso_extra_no_se_repite_en_la_membresia(user):
+    """La misma acción extra no se guarda dos veces en una membresía."""
+    farm = Farm.objects.create(name="La Esperanza")
+    membership = FarmMembership.objects.create(
+        farm=farm,
+        user=user,
+        role=FarmRole.OPERADOR,
+    )
+    FarmPermission.objects.create(membership=membership, permission="ajustar_stock")
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            FarmPermission.objects.create(membership=membership, permission="ajustar_stock")

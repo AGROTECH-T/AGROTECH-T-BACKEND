@@ -17,18 +17,18 @@ REGLAS = (
     },
     {
         "numero": 3,
-        "titulo": "Rol por membresía",
-        "detalle": "El rol pertenece a la relación entre cuenta y finca, no a la cuenta global.",
+        "titulo": "Un rol por membresía",
+        "detalle": "Cada cuenta tiene un solo rol en cada finca; cambiarlo reemplaza el anterior.",
     },
     {
         "numero": 4,
-        "titulo": "Cambios efectivos",
-        "detalle": "Un cambio de rol se aplica desde la siguiente solicitud al backend.",
+        "titulo": "Permisos por rol, no sueltos",
+        "detalle": "Los permisos vienen del rol y no se asignan a una persona por separado.",
     },
     {
         "numero": 5,
-        "titulo": "Membresía desactivada",
-        "detalle": "Pierde el acceso y se conserva la atribución de sus acciones previas.",
+        "titulo": "Cambios efectivos",
+        "detalle": "Un cambio de rol se aplica desde la siguiente solicitud al backend.",
     },
     {
         "numero": 6,
@@ -37,36 +37,17 @@ REGLAS = (
     },
     {
         "numero": 7,
-        "titulo": "Sin eliminación permanente ordinaria",
-        "detalle": "Las operaciones normales no borran definitivamente los registros históricos.",
+        "titulo": "Solo fincas administradas",
+        "detalle": "El administrador cambia roles únicamente en las fincas donde tiene ese rol.",
     },
     {
         "numero": 8,
-        "titulo": "Confirmaciones y auditoría",
-        "detalle": "Los cambios sensibles piden confirmación y dejan trazabilidad.",
-    },
-    {
-        "numero": 9,
         "titulo": "Denegación segura",
         "detalle": "Los mensajes de acceso denegado no revelan información privada de la finca.",
-    },
-    {
-        "numero": 10,
-        "titulo": "Estado y suscripción separados",
-        "detalle": "La autorización considera estado de la finca, suscripción, membresía y rol.",
     },
 )
 
 PENDIENTES = (
-    "Alcance exacto de la consulta de datos generales por parte del operador.",
-    "Permisos concretos para agregar y retirar actividades productivas.",
-    "Permisos de creación y actualización de registros por módulo.",
-    "Excepciones a la regla de no eliminación de registros.",
-    "Consulta del estado de suscripción por parte del operador y del rol Consulta.",
-    "Permisos de exportación de información no financiera.",
-    "Permisos específicos de edición financiera.",
-    "Procedimiento técnico de autorización temporal y recuperación excepcional por soporte.",
-    "Política de conservación de auditorías y notificaciones.",
+    "Acceso temporal y limitado del soporte técnico.",
+    "Suscripciones, facturación y avisos de pago.",
 )
-
-
