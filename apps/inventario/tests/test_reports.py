@@ -69,6 +69,40 @@ def test_reporte_de_ajustes_rechaza_motivo_invalido(user):
         report_services.adjustment_report(user=user, farm_id=farm_id, reason="no_existe")
     assert error.value.status_code == 400
 @pytest.mark.django_db
+def test_reporte_de_consumo_suma_salidas(user):
+    """El consumo cuenta las salidas del producto."""
+    farm_id, product = _farm_product(user)
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("10"),
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.SALIDA,
+        quantity=Decimal("3"),
+        note="lote 1",
+    )
+    data = report_services.consumption_report(user=user, farm_id=farm_id)
+    assert data["rows"][0]["product"] == "Semilla"
+    assert data["rows"][0]["moves"] == 1
+@pytest.mark.django_db
+def test_reporte_de_consumo_rechaza_rango_invertido(user):
+    """La fecha inicial no puede ir después de la final."""
+    farm_id, _product = _farm_product(user)
+    with pytest.raises(AppError) as error:
+        report_services.consumption_report(
+            user=user,
+            farm_id=farm_id,
+            date_from=date.today(),
+            date_to=date.today() - timedelta(days=1),
+        )
+    assert error.value.status_code == 400
+@pytest.mark.django_db
 def test_consulta_puede_leer_reportes(user, make_user):
     """Quien solo consulta ve el reporte; no hace falta ser admin."""
     farm_id, _product = _farm_product(user)

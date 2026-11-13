@@ -70,6 +70,72 @@ class AdjustmentReportFileView(APIView):
             ]
         )
         return download(payload, f"ajustes-{farm_id}.xlsx")
+class ConsumptionReportFileView(APIView):
+    """Excel del consumo del rango y su tendencia."""
+
+    @extend_schema(tags=["inventario"])
+    def get(self, request: Request, farm_id: int) -> HttpResponse:
+        data = report_services.consumption_report(
+            user=request.user,
+            farm_id=farm_id,
+            date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
+            date_to=optional_date(request.query_params.get("to"), "la fecha final"),
+            category_code=request.query_params.get("category") or None,
+            product_id=read_product(request.query_params.get("product")),
+        )
+        rows = [
+            [
+                row["product"],
+                row["category"],
+                row["unit"],
+                row["quantity"],
+                f"{row['base']} {row['base_symbol']}",
+                str(row["moves"]),
+                f"{row['share']}%",
+                "" if row["previous"] is None else row["previous"],
+                "" if row["variation"] is None else f"{row['variation']}%",
+            ]
+            for row in data["rows"]
+        ]
+        symbols = sorted(
+            {
+                entry["symbol"]
+                for month in data["trend"]
+                for entry in month["items"]
+            }
+        )
+        months = [
+            [
+                f"{month['label']} (mes en curso)" if month["current"] else month["label"],
+                *[trend_amount(month, symbol) for symbol in symbols],
+            ]
+            for month in data["trend"]
+        ]
+        payload = book(
+            [
+                (
+                    "Consumo",
+                    [
+                        "Producto",
+                        "Categoría",
+                        "Unidad",
+                        "Consumido",
+                        "Equivalencia",
+                        "Movimientos",
+                        "Parte del total",
+                        "Periodo anterior",
+                        "Variación",
+                    ],
+                    rows,
+                ),
+                (
+                    "Meses",
+                    ["Mes", *[f"Consumo ({symbol})" for symbol in symbols]],
+                    months,
+                ),
+            ]
+        )
+        return download(payload, f"consumo-{farm_id}.xlsx")
 def download(payload: bytes, filename: str) -> HttpResponse:
     """Respuesta de descarga del libro armado."""
     response = HttpResponse(payload, content_type=XLSX)

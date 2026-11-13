@@ -113,6 +113,266 @@ def adjustment_report(
             }
         )
     return {"rows": rows, "count": len(rows), "up": up, "down": down}
+def consumption_report(
+    *,
+    user: User,
+    farm_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    category_code: str | None = None,
+    product_id: int | None = None,
+) -> dict:
+    """Qué producto se gastó más en el rango, con comparación y tendencia."""
+    _guard(user=user, farm_id=farm_id, date_from=date_from, date_to=date_to)
+    queryset = _consumption_query(
+        farm_id=farm_id,
+        date_from=date_from,
+        date_to=date_to,
+        category_code=category_code,
+        product_id=product_id,
+    )
+    grouped: dict[int, dict] = {}
+    for move in queryset:
+        item = grouped.setdefault(
+            move.product_id,
+            {
+                "product_id": move.product_id,
+                "product": move.product.name,
+                "category": move.product.category.name,
+                "unit": move.unit.label,
+                "base_symbol": move.unit.base_unit.symbol,
+                "quantity": ZERO,
+                "base": ZERO,
+                "moves": 0,
+            },
+        )
+        item["quantity"] += move.quantity
+        item["base"] += move.quantity_base
+        item["moves"] += 1
+
+    total = sum((item["base"] for item in grouped.values()), ZERO)
+    by_symbol: dict[str, Decimal] = {}
+    for item in grouped.values():
+        by_symbol[item["base_symbol"]] = by_symbol.get(item["base_symbol"], ZERO) + item["base"]
+
+    previous = _previous_consumption(
+        farm_id=farm_id,
+        date_from=date_from,
+        date_to=date_to,
+        category_code=category_code,
+        product_id=product_id,
+    )
+    rows = []
+    has_previous = previous["available"]
+    for item in grouped.values():
+        before = previous["by_product"].get(item["product_id"], ZERO)
+        rows.append(
+            {
+                "product_id": item["product_id"],
+                "product": item["product"],
+                "category": item["category"],
+                "unit": item["unit"],
+                "base_symbol": item["base_symbol"],
+                "quantity": plain_amount(item["quantity"]),
+                "base": plain_amount(item["base"]),
+                "moves": item["moves"],
+                "share": _share(item["base"], total),
+                "previous": plain_amount(before) if has_previous else None,
+                "variation": _variation(item["base"], before) if has_previous else None,
+            }
+        )
+    rows.sort(key=lambda row: row["share"], reverse=True)
+    return {
+        "rows": rows,
+        "count": len(rows),
+        "total": plain_amount(total),
+        "by_symbol": [
+            {"symbol": symbol, "base": plain_amount(value)}
+            for symbol, value in sorted(by_symbol.items())
+        ],
+        "previous": {
+            "available": has_previous,
+            "from": previous["from"],
+            "to": previous["to"],
+            "total": plain_amount(previous["total"]) if has_previous else None,
+        },
+        "trend": _trend(
+            farm_id=farm_id,
+            category_code=category_code,
+            product_id=product_id,
+        ),
+        "flow": _flow(
+            farm_id=farm_id,
+            date_from=date_from,
+            date_to=date_to,
+            category_code=category_code,
+            product_id=product_id,
+        ),
+    }
+def _flow(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+    category_code: str | None,
+    product_id: int | None,
+) -> list[dict]:
+    """Cuenta entradas y salidas por día, con los mismos filtros del reporte."""
+    queryset = Movement.objects.filter(
+        product__farm_id=farm_id,
+        kind__in=(MovementKind.ENTRADA, MovementKind.SALIDA),
+    )
+    queryset = _in_range(queryset, date_from, date_to)
+    if category_code:
+        queryset = queryset.filter(product__category__code=category_code)
+    if product_id is not None:
+        queryset = queryset.filter(product_id=product_id)
+
+    counts: dict[date, dict[str, int]] = {}
+    for created_at, kind in queryset.values_list("created_at", "kind"):
+        bucket = counts.setdefault(created_at.date(), {"entradas": 0, "salidas": 0})
+        if kind == MovementKind.ENTRADA:
+            bucket["entradas"] += 1
+        else:
+            bucket["salidas"] += 1
+
+    if not counts and (date_from is None or date_to is None):
+        return []
+    start = date_from or min(counts)
+    end = date_to or max(counts)
+    rows = []
+    day = start
+    while day <= end:
+        bucket = counts.get(day, {"entradas": 0, "salidas": 0})
+        rows.append(
+            {
+                "day": day.isoformat(),
+                "label": day.strftime("%d/%m"),
+                "entradas": bucket["entradas"],
+                "salidas": bucket["salidas"],
+            }
+        )
+        day += timedelta(days=1)
+        if len(rows) > 370:
+            break
+    return rows
+def _consumption_query(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+    category_code: str | None,
+    product_id: int | None,
+):
+    """Salidas del rango con sus datos de producto y unidad."""
+    queryset = Movement.objects.filter(
+        product__farm_id=farm_id,
+        kind=MovementKind.SALIDA,
+    ).select_related("product", "product__category", "unit", "unit__base_unit")
+    queryset = _in_range(queryset, date_from, date_to)
+    if category_code:
+        queryset = queryset.filter(product__category__code=category_code)
+    if product_id is not None:
+        queryset = queryset.filter(product_id=product_id)
+    return queryset
+def _previous_consumption(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+    category_code: str | None,
+    product_id: int | None,
+) -> dict:
+    """Consumo del periodo anterior de igual duración."""
+    if date_from is None or date_to is None:
+        return {
+            "available": False,
+            "from": None,
+            "to": None,
+            "total": ZERO,
+            "by_product": {},
+        }
+    days = (date_to - date_from).days + 1
+    previous_to = date_from - timedelta(days=1)
+    previous_from = previous_to - timedelta(days=days - 1)
+    queryset = _consumption_query(
+        farm_id=farm_id,
+        date_from=previous_from,
+        date_to=previous_to,
+        category_code=category_code,
+        product_id=product_id,
+    )
+    by_product: dict[int, Decimal] = {}
+    total = ZERO
+    for move in queryset:
+        by_product[move.product_id] = by_product.get(move.product_id, ZERO) + move.quantity_base
+        total += move.quantity_base
+    return {
+        "available": True,
+        "from": previous_from.isoformat(),
+        "to": previous_to.isoformat(),
+        "total": total,
+        "by_product": by_product,
+    }
+def _trend(
+    *,
+    farm_id: int,
+    category_code: str | None,
+    product_id: int | None,
+) -> list[dict]:
+    """Consumo de los últimos seis meses, mes a mes."""
+    today = date.today()
+    months = []
+    year, month = today.year, today.month
+    for _ in range(6):
+        months.append((year, month))
+        month -= 1
+        if month == 0:
+            month = 12
+            year -= 1
+    months.reverse()
+
+    start_year, start_month = months[0]
+    start = date(start_year, start_month, 1)
+    queryset = _consumption_query(
+        farm_id=farm_id,
+        date_from=start,
+        date_to=today,
+        category_code=category_code,
+        product_id=product_id,
+    )
+    buckets: dict[tuple[int, int], dict[str, Decimal]] = {}
+    for move in queryset:
+        key = (move.created_at.year, move.created_at.month)
+        symbol = move.unit.base_unit.symbol
+        bucket = buckets.setdefault(key, {})
+        bucket[symbol] = bucket.get(symbol, ZERO) + move.quantity_base
+
+    rows = []
+    for year, month in months:
+        bucket = buckets.get((year, month), {})
+        rows.append(
+            {
+                "month": f"{year}-{month:02d}",
+                "label": f"{MONTHS[month - 1]} {year}",
+                "current": (year, month) == (today.year, today.month),
+                "items": [
+                    {"symbol": symbol, "base": plain_amount(value)}
+                    for symbol, value in sorted(bucket.items())
+                ],
+            }
+        )
+    return rows
+def _share(value: Decimal, total: Decimal) -> float:
+    """Porcentaje del total, con un decimal."""
+    if total <= ZERO:
+        return 0.0
+    return round(float(value / total * 100), 1)
+def _variation(current: Decimal, previous: Decimal) -> float | None:
+    """Variación contra el periodo anterior, en porcentaje."""
+    if previous <= ZERO:
+        return None
+    return round(float((current - previous) / previous * 100), 1)
 def products_for_filter(*, user: User, farm_id: int) -> list[Product]:
     """Productos de la finca para los selectores de los reportes."""
     membership = require_membership(user=user, farm_id=farm_id)

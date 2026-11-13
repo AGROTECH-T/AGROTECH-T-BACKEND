@@ -24,6 +24,20 @@ class AdjustmentReportView(APIView):
             reason=request.query_params.get("reason") or None,
         )
         return Response(with_iso_dates(data))
+class ConsumptionReportView(APIView):
+    """Productos con más consumo, comparación y tendencia."""
+
+    @extend_schema(tags=["inventario"])
+    def get(self, request: Request, farm_id: int) -> Response:
+        data = report_services.consumption_report(
+            user=request.user,
+            farm_id=farm_id,
+            date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
+            date_to=optional_date(request.query_params.get("to"), "la fecha final"),
+            category_code=request.query_params.get("category") or None,
+            product_id=read_product(request.query_params.get("product")),
+        )
+        return Response(data)
 def read_product(raw: str | None) -> int | None:
     """Lee el identificador del producto o nada."""
     if not raw:
