@@ -98,3 +98,6 @@ def test_salida_no_deja_stock_negativo(user):
             quantity=Decimal("5"),
         )
     assert error.value.status_code == 400
+    product.refresh_from_db()
+    assert product.quantity == Decimal("2")
+    assert product.movements.count() == 1

@@ -11,7 +11,7 @@ from django.db import transaction
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.inventario.models import Movement, MovementKind, Product
-from apps.inventario.services.membership import require_membership
+from apps.inventario.services.membership import require_write_membership
 from apps.inventario.services.products import get_product
 
 ZERO = Decimal("0")
@@ -26,22 +26,21 @@ def register_movement(
     quantity: Decimal,
     note: str = "",
 ) -> Movement:
-    """Aplica un movimiento y actualiza el stock del producto."""
+    """Aplica un movimiento tras bloquear finca, membresía y producto."""
     if kind not in MovementKind.values:
         raise AppError("tipo de movimiento inválido", 400)
     if quantity <= ZERO:
         raise AppError("la cantidad debe ser mayor que cero", 400)
 
     with transaction.atomic():
+        require_write_membership(user=user, farm_id=farm_id)
         product = (
             Product.objects.select_for_update()
             .filter(id=product_id, farm_id=farm_id, is_active=True)
             .first()
         )
         if product is None:
-            require_membership(user=user, farm_id=farm_id)
             raise AppError("producto no encontrado", 404)
-        require_membership(user=user, farm_id=farm_id)
 
         new_qty = _next_quantity(product.quantity, kind, quantity)
         if new_qty < ZERO:

@@ -22,6 +22,9 @@ def make_user(db):
             phone=kwargs.pop("phone", "3001234567"),
             correo=kwargs.pop("correo", f"{identification}@example.com"),
             password_hash=make_password(kwargs.pop("password", "Secure1!")),
+            can_create_farms=kwargs.pop("can_create_farms", True),
+            # F10.2: crear fincas exige correo verificado en el servicio.
+            email_verified=kwargs.pop("email_verified", True),
             **kwargs,
         )
 

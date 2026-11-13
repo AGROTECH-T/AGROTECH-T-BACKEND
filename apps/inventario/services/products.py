@@ -6,13 +6,16 @@ Contexto: unidad y categoría salen del catálogo del sistema.
 """
 from decimal import Decimal
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.inventario.catalog import InventoryCategory, InventoryUnit
 from apps.inventario.models import Product
-from apps.inventario.services.membership import require_membership
+from apps.inventario.services.membership import (
+    require_membership,
+    require_write_membership,
+)
 
 ZERO = Decimal("0")
 
@@ -47,26 +50,35 @@ def create_product(
     min_stock: Decimal = ZERO,
 ) -> Product:
     """Crea un insumo con código de barras y catálogo del sistema."""
-    membership = require_membership(user=user, farm_id=farm_id)
-    clean_name = _required_text(name, "el nombre del insumo es obligatorio", 100)
-    clean_barcode = _required_text(barcode, "el código de barras es obligatorio", 64)
-    if unit not in InventoryUnit.values:
-        raise AppError("unidad no válida", 400)
-    if category not in InventoryCategory.values:
-        raise AppError("categoría no válida", 400)
-    if min_stock < ZERO:
-        raise AppError("el stock mínimo no puede ser negativo", 400)
-
     try:
-        return Product.objects.create(
-            farm=membership.farm,
-            name=clean_name,
-            barcode=clean_barcode,
-            unit=unit,
-            category=category,
-            min_stock=min_stock,
-            quantity=ZERO,
-        )
+        with transaction.atomic():
+            membership = require_write_membership(user=user, farm_id=farm_id)
+            clean_name = _required_text(
+                name,
+                "el nombre del insumo es obligatorio",
+                100,
+            )
+            clean_barcode = _required_text(
+                barcode,
+                "el código de barras es obligatorio",
+                64,
+            )
+            if unit not in InventoryUnit.values:
+                raise AppError("unidad no válida", 400)
+            if category not in InventoryCategory.values:
+                raise AppError("categoría no válida", 400)
+            if min_stock < ZERO:
+                raise AppError("el stock mínimo no puede ser negativo", 400)
+
+            return Product.objects.create(
+                farm_id=membership.farm_id,
+                name=clean_name,
+                barcode=clean_barcode,
+                unit=unit,
+                category=category,
+                min_stock=min_stock,
+                quantity=ZERO,
+            )
     except IntegrityError as exc:
         raise AppError("ese código de barras ya existe en la finca", 409) from exc
 
