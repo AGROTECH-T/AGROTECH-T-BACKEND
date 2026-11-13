@@ -7,7 +7,9 @@ que ya está en los movimientos, sin guardar cifras aparte.
 """
 from datetime import date, timedelta
 from decimal import Decimal
+
 from django.db.models import F, Sum
+
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.inventario.catalog import plain_amount
@@ -21,6 +23,7 @@ from apps.inventario.models import (
 from apps.inventario.services import products as product_services
 from apps.inventario.services.membership import require_membership
 from apps.inventario.services.permissions import READ, require_action
+
 ZERO = Decimal("0")
 MONTHS = (
     "enero",
@@ -36,6 +39,8 @@ MONTHS = (
     "noviembre",
     "diciembre",
 )
+
+
 def _guard(
     *,
     user: User,
@@ -49,6 +54,8 @@ def _guard(
     if date_from is not None and date_to is not None and date_from > date_to:
         raise AppError("el rango de fechas no es válido", 400)
     return membership
+
+
 def _in_range(queryset, date_from: date | None, date_to: date | None):
     """Recorta el queryset al rango de fechas, si lo hay."""
     if date_from is not None:
@@ -56,14 +63,20 @@ def _in_range(queryset, date_from: date | None, date_to: date | None):
     if date_to is not None:
         queryset = queryset.filter(created_at__date__lte=date_to)
     return queryset
+
+
 def _user_name(user: User) -> str:
     """Nombre visible de quien registró el movimiento."""
     return f"{user.first_name} {user.last_name}".strip() or user.identification
+
+
 def _reason_label(reason: str) -> str:
     """Texto del motivo, o aviso cuando el ajuste es viejo."""
     if not reason:
         return "Sin motivo"
     return AdjustmentReason(reason).label
+
+
 def adjustment_report(
     *,
     user: User,
@@ -113,6 +126,8 @@ def adjustment_report(
             }
         )
     return {"rows": rows, "count": len(rows), "up": up, "down": down}
+
+
 def consumption_report(
     *,
     user: User,
@@ -209,6 +224,8 @@ def consumption_report(
             product_id=product_id,
         ),
     }
+
+
 def loan_report(
     *,
     user: User,
@@ -292,6 +309,109 @@ def loan_report(
             )
         ],
     }
+
+
+def order_report(
+    *,
+    user: User,
+    farm_id: int,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    category_code: str | None = None,
+    only_low: bool = False,
+    target: str = "min",
+) -> dict:
+    """Inicial contra actual por producto y cuánto conviene pedir.
+
+    El inicial solo se informa cuando sale de un movimiento registrado o
+    cuando el producto ya existía y no se movió en el rango. Si no hay
+    registro, queda vacío en vez de calcularlo a la inversa.
+    """
+    _guard(user=user, farm_id=farm_id, date_from=date_from, date_to=date_to)
+    if target not in ("min", "doble"):
+        raise AppError("objetivo inválido", 400)
+
+    products = product_services.list_products(
+        user=user,
+        farm_id=farm_id,
+        status="all",
+        category_code=category_code,
+        order="name",
+    )
+    entries = _movement_totals(
+        farm_id=farm_id,
+        kind=MovementKind.ENTRADA,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    exits = _movement_totals(
+        farm_id=farm_id,
+        kind=MovementKind.SALIDA,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    adjusts = _adjustment_totals(
+        farm_id=farm_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    opening = _opening_stock(
+        farm_id=farm_id,
+        date_from=date_from,
+        date_to=date_to,
+    )
+
+    rows = []
+    low = 0
+    to_order = 0
+    for product in products:
+        entered = entries.get(product.id, ZERO)
+        exited = exits.get(product.id, ZERO)
+        adjusted = adjusts.get(product.id, ZERO)
+        current = product.quantity
+        initial = _initial_stock(
+            product=product,
+            opening=opening.get(product.id),
+            date_from=date_from,
+        )
+        missing = max(ZERO, product.min_stock - current)
+        goal = product.min_stock * 2 if target == "doble" else product.min_stock
+        suggested = max(ZERO, goal - current)
+        is_low = current <= product.min_stock
+        if is_low:
+            low += 1
+        if suggested > ZERO:
+            to_order += 1
+        if only_low and not is_low:
+            continue
+        rows.append(
+            {
+                "product_id": product.id,
+                "product": product.name,
+                "category": product.category.name,
+                "unit": product.unit.label,
+                "initial": None if initial is None else plain_amount(initial),
+                "initial_known": initial is not None,
+                "moves": opening.get(product.id, {}).get("moves", 0),
+                "entries": plain_amount(entered),
+                "exits": plain_amount(exited),
+                "adjustments": plain_amount(adjusted),
+                "current": plain_amount(current),
+                "min": plain_amount(product.min_stock),
+                "missing": plain_amount(missing),
+                "suggested": plain_amount(suggested),
+                "lent": plain_amount(product.lent_quantity),
+                "is_low": is_low,
+            }
+        )
+    return {
+        "rows": rows,
+        "count": len(rows),
+        "low": low,
+        "to_order": to_order,
+    }
+
+
 def _flow(
     *,
     farm_id: int,
@@ -339,6 +459,8 @@ def _flow(
         if len(rows) > 370:
             break
     return rows
+
+
 def _consumption_query(
     *,
     farm_id: int,
@@ -358,6 +480,8 @@ def _consumption_query(
     if product_id is not None:
         queryset = queryset.filter(product_id=product_id)
     return queryset
+
+
 def _previous_consumption(
     *,
     farm_id: int,
@@ -397,6 +521,8 @@ def _previous_consumption(
         "total": total,
         "by_product": by_product,
     }
+
+
 def _trend(
     *,
     farm_id: int,
@@ -446,16 +572,99 @@ def _trend(
             }
         )
     return rows
+
+
+def _movement_totals(
+    *,
+    farm_id: int,
+    kind: str,
+    date_from: date | None,
+    date_to: date | None,
+) -> dict[int, Decimal]:
+    """Suma las cantidades de un tipo de movimiento por producto."""
+    queryset = Movement.objects.filter(product__farm_id=farm_id, kind=kind)
+    queryset = _in_range(queryset, date_from, date_to)
+    totals = queryset.values("product_id").annotate(total=Sum("quantity"))
+    return {row["product_id"]: row["total"] or ZERO for row in totals}
+
+
+def _opening_stock(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+) -> dict[int, dict]:
+    """Stock real al abrir el rango, según el primer movimiento registrado."""
+    queryset = _in_range(
+        Movement.objects.filter(product__farm_id=farm_id),
+        date_from,
+        date_to,
+    ).order_by("created_at", "id")
+    bounds: dict[int, dict] = {}
+    for row in queryset.values("product_id", "stock_before", "stock_after"):
+        item = bounds.get(row["product_id"])
+        if item is None:
+            bounds[row["product_id"]] = {
+                "opening": row["stock_before"],
+                "moves": 1,
+            }
+        else:
+            item["moves"] += 1
+    return bounds
+
+
+def _initial_stock(
+    *,
+    product: Product,
+    opening: dict | None,
+    date_from: date | None,
+) -> Decimal | None:
+    """Stock inicial comprobable, o nada cuando no hay registro.
+
+    Con movimientos en el rango se toma el stock previo al primero. Sin
+    movimientos, el stock no cambió: sirve el actual, siempre que el
+    producto ya existiera al abrir el rango. Sin fecha inicial no hay
+    apertura que informar.
+    """
+    if date_from is None:
+        return None
+    if opening is not None:
+        return opening["opening"]
+    if product.created_at.date() <= date_from:
+        return product.quantity
+    return None
+
+
+def _adjustment_totals(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+) -> dict[int, Decimal]:
+    """Suma la diferencia de los ajustes por producto."""
+    queryset = Movement.objects.filter(
+        product__farm_id=farm_id,
+        kind=MovementKind.AJUSTE,
+    )
+    queryset = _in_range(queryset, date_from, date_to)
+    totals = queryset.values("product_id").annotate(total=Sum(F("stock_after") - F("stock_before")))
+    return {row["product_id"]: row["total"] or ZERO for row in totals}
+
+
 def _share(value: Decimal, total: Decimal) -> float:
     """Porcentaje del total, con un decimal."""
     if total <= ZERO:
         return 0.0
     return round(float(value / total * 100), 1)
+
+
 def _variation(current: Decimal, previous: Decimal) -> float | None:
     """Variación contra el periodo anterior, en porcentaje."""
     if previous <= ZERO:
         return None
     return round(float((current - previous) / previous * 100), 1)
+
+
 def products_for_filter(*, user: User, farm_id: int) -> list[Product]:
     """Productos de la finca para los selectores de los reportes."""
     membership = require_membership(user=user, farm_id=farm_id)

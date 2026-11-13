@@ -27,11 +27,13 @@ from apps.inventario.api.units.base_view import BaseUnitCreateView, BaseUnitDeta
 from apps.inventario.api.units.create_view import CustomUnitCreateView
 from apps.inventario.api.units.detail_view import UnitDetailView
 from apps.inventario.api.reports.files import (
+    OrderReportFileView,
     LoanReportFileView,
     ConsumptionReportFileView,
     AdjustmentReportFileView,
 )
 from apps.inventario.api.reports.views import (
+    OrderReportView,
     LoanReportView,
     ConsumptionReportView,
     AdjustmentReportView,
@@ -155,5 +157,15 @@ urlpatterns = [
         "inventory/<int:farm_id>/reports/loans.xlsx",
         LoanReportFileView.as_view(),
         name="report-loans-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/order/",
+        OrderReportView.as_view(),
+        name="report-order",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/order.xlsx",
+        OrderReportFileView.as_view(),
+        name="report-order-file",
     ),
 ]
