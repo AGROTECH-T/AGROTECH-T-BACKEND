@@ -67,6 +67,11 @@ class AsignacionSerializer(serializers.Serializer):
     puedo_asignar = serializers.BooleanField()
     fincas = serializers.ListField(child=serializers.DictField())
     usuarios = UsuarioAsignadoSerializer(many=True)
+class CambiarRolSerializer(serializers.Serializer):
+    """Rol nuevo de una persona en una finca."""
+
+    farm_id = serializers.IntegerField(min_value=1)
+    role = serializers.ChoiceField(choices=FarmRole.values)
 class RolesPermisosSerializer(serializers.Serializer):
     """Documenta el catálogo completo que consume Configuración."""
 

@@ -43,3 +43,22 @@ class DetalleUsuarioView(APIView):
     def get(self, request: Request, user_id: int) -> Response:
         """Devuelve la ficha con permisos del rol y permisos directos."""
         return Response(asignacion.detalle_persona(actor=request.user, user_id=user_id))
+class CambiarRolView(APIView):
+    """Cambia el rol de otra persona en una finca administrada."""
+
+    @extend_schema(
+        request=CambiarRolSerializer,
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def put(self, request: Request, user_id: int) -> Response:
+        """Reemplaza el rol de la membresía indicada."""
+        payload = CambiarRolSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.cambiar_rol(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=payload.validated_data["farm_id"],
+            role=payload.validated_data["role"],
+        )
+        return Response(persona)

@@ -32,6 +32,21 @@ def detalle_persona(*, actor: User, user_id: int) -> dict:
         raise AppError("solo el administrador puede ver los permisos", 403)
     person = _persona(actor, farm_ids, user_id)
     return _ficha_detalle(actor, person, farm_ids)
+def cambiar_rol(*, actor: User, user_id: int, farm_id: int, role: str) -> dict:
+    """Cambia el rol de otra persona en una finca administrada."""
+    if role not in FarmRole.values:
+        raise AppError("el rol no es válido", 400)
+    if not _es_administrador(actor, farm_id):
+        _rechazar_finca(actor, farm_id)
+    if actor.id == user_id:
+        raise AppError("no puedes cambiar tu propio rol", 403)
+    membership = _membresia(user_id, farm_id)
+    _conservar_administrador(membership, role)
+    membership.role = role
+    membership.save(update_fields=["role"])
+    farm_ids = _fincas_administradas(actor)
+    person = _persona(actor, farm_ids, user_id)
+    return _ficha_detalle(actor, person, farm_ids)
 def _fincas_administradas(actor: User) -> list[int]:
     """Identificadores de fincas donde el actor es administrador."""
     return list(
@@ -40,6 +55,29 @@ def _fincas_administradas(actor: User) -> list[int]:
             role=FarmRole.ADMINISTRADOR,
         ).values_list("farm_id", flat=True)
     )
+def _es_administrador(actor: User, farm_id: int) -> bool:
+    """Indica si el actor administra esa finca."""
+    return FarmMembership.objects.filter(
+        user=actor,
+        farm_id=farm_id,
+        role=FarmRole.ADMINISTRADOR,
+    ).exists()
+def _rechazar_finca(actor: User, farm_id: int) -> None:
+    """Distingue entre finca ajena y finca propia sin permiso."""
+    pertenece = FarmMembership.objects.filter(user=actor, farm_id=farm_id).exists()
+    if pertenece:
+        raise AppError("solo el administrador puede cambiar roles", 403)
+    raise AppError("finca no encontrada", 404)
+def _membresia(user_id: int, farm_id: int) -> FarmMembership:
+    """Membresía de la persona en la finca o error 404."""
+    membership = (
+        FarmMembership.objects.filter(user_id=user_id, farm_id=farm_id)
+        .select_related("user", "farm")
+        .first()
+    )
+    if membership is None:
+        raise AppError("esa persona no pertenece a la finca", 404)
+    return membership
 def _persona(actor: User, farm_ids: list[int], user_id: int) -> User:
     """Cuenta visible para el actor o error 404."""
     person = (
@@ -50,6 +88,21 @@ def _persona(actor: User, farm_ids: list[int], user_id: int) -> User:
     if person is None:
         raise AppError("esa persona no pertenece a tus fincas", 404)
     return person
+def _conservar_administrador(membership: FarmMembership, role: str) -> None:
+    """Impide dejar la finca sin un administrador activo."""
+    if membership.role != FarmRole.ADMINISTRADOR or role == FarmRole.ADMINISTRADOR:
+        return
+    queda_otro = (
+        FarmMembership.objects.filter(
+            farm_id=membership.farm_id,
+            role=FarmRole.ADMINISTRADOR,
+            user__is_active=True,
+        )
+        .exclude(user_id=membership.user_id)
+        .exists()
+    )
+    if not queda_otro:
+        raise AppError("la finca debe conservar un administrador", 400)
 def _agrupar(
     actor: User,
     farm_ids: list[int],

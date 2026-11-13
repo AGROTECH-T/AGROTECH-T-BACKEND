@@ -10,6 +10,7 @@ from apps.farms.api.views import (
     RolesPermisosView,
     AsignacionRolesView,
     DetalleUsuarioView,
+    CambiarRolView,
 )
 
 urlpatterns = [
@@ -27,5 +28,10 @@ urlpatterns = [
         "configuracion/usuarios/<int:user_id>/",
         DetalleUsuarioView.as_view(),
         name="configuracion-usuario-detalle",
+    ),
+    path(
+        "configuracion/usuarios/<int:user_id>/rol/",
+        CambiarRolView.as_view(),
+        name="configuracion-cambiar-rol",
     ),
 ]
