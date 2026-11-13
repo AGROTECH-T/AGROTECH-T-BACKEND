@@ -10,7 +10,12 @@ from rest_framework.test import APIClient
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
-from apps.accounts.services.access import cuenta_publica, modulos_visibles
+from apps.accounts.services.access import (
+    MODULOS_COMPLETOS,
+    cuenta_publica,
+    modulos_visibles,
+    puede_crear_finca,
+)
 from apps.accounts.services.platform_admin import (
     crear_administrador,
     listar_administradores,
@@ -76,22 +81,18 @@ def test_cuenta_nueva_solo_ve_inicio(user):
     assert payload["modulos"] == ["home"]
 
 
-def test_superadmin_ve_configuracion(superadmin):
-    """El superadmin entra a Configuración para nombrar administradores."""
-    assert modulos_visibles(superadmin) == ["home", "configuracion"]
+def test_superadmin_ve_todos_los_modulos(superadmin):
+    """El superadmin opera toda la plataforma, igual que el administrador."""
+    assert modulos_visibles(superadmin) == MODULOS_COMPLETOS
+    assert puede_crear_finca(superadmin) is True
 
 
 def test_administrador_ve_todos_los_modulos(user):
     """El administrador nombrado opera fincas, inventario, galpón y roles."""
     user.is_administrador = True
     user.save(update_fields=["is_administrador"])
-    assert modulos_visibles(user) == [
-        "home",
-        "fincas",
-        "inventario",
-        "galpon",
-        "configuracion",
-    ]
+    assert modulos_visibles(user) == MODULOS_COMPLETOS
+    assert puede_crear_finca(user) is True
 
 
 @pytest.mark.django_db

@@ -7,12 +7,13 @@ from django.db import transaction
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
+from apps.accounts.services.access import puede_crear_finca
 from apps.farms.models import Farm, FarmMembership, FarmRole
 
 
 def create_farm(*, user: User, name: str) -> FarmMembership:
     """Crea una finca y la membresía administradora en una sola transacción."""
-    if not user.is_administrador:
+    if not puede_crear_finca(user):
         raise AppError("solo un administrador puede crear fincas", 403)
     validated_name = _validate_farm_name(name)
     with transaction.atomic():

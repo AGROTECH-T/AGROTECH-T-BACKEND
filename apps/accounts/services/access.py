@@ -14,6 +14,17 @@ INVENTARIO = "inventario"
 GALPON = "galpon"
 CONFIGURACION = "configuracion"
 
+MODULOS_COMPLETOS = [HOME, FINCAS, INVENTARIO, GALPON, CONFIGURACION]
+
+
+def puede_crear_finca(user: User) -> bool:
+    """El superadmin y el administrador nombrado pueden abrir fincas.
+
+    @param user Cuenta autenticada.
+    @returns True si puede crear fincas.
+    """
+    return user.is_superadmin or user.is_administrador
+
 
 def modulos_visibles(user: User) -> list[str]:
     """Secciones del menú que esa cuenta puede abrir.
@@ -21,10 +32,8 @@ def modulos_visibles(user: User) -> list[str]:
     @param user Cuenta autenticada.
     @returns Identificadores de módulo en el orden del menú.
     """
-    if user.is_superadmin:
-        return [HOME, CONFIGURACION]
-    if user.is_administrador:
-        return [HOME, FINCAS, INVENTARIO, GALPON, CONFIGURACION]
+    if user.is_superadmin or user.is_administrador:
+        return list(MODULOS_COMPLETOS)
     memberships = list(user.farm_memberships.all())
     if not memberships:
         return [HOME]
