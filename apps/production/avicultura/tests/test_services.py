@@ -61,3 +61,30 @@ def test_permiso_directo_permite_registrar(user, make_user, farm_id):
     FarmPermission.objects.create(membership=membership, permission=REGISTRAR_GALPON)
     house = _galpon(reader, farm_id, name="Delegado")
     assert house.name == "Delegado"
+@pytest.mark.django_db
+def test_actualiza_y_borra_un_galpon(user, farm_id):
+    """Se puede cambiar el nombre y luego quitar el galpón."""
+    house = _galpon(user, farm_id, name="Norte")
+    updated = house_services.update_house(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        name="Sur",
+    )
+    assert updated.name == "Sur"
+    house_services.delete_house(user=user, farm_id=farm_id, house_id=house.id)
+    listed = house_services.list_houses(user=user, farm_id=farm_id)
+    assert listed.count() == 0
+@pytest.mark.django_db
+def test_no_renombra_a_un_galpon_existente(user, farm_id):
+    """El nombre no se duplica en la misma finca."""
+    _galpon(user, farm_id, name="Norte")
+    other = _galpon(user, farm_id, name="Sur")
+    with pytest.raises(AppError) as error:
+        house_services.update_house(
+            user=user,
+            farm_id=farm_id,
+            house_id=other.id,
+            name="Norte",
+        )
+    assert error.value.status_code == 409
