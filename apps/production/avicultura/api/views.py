@@ -218,6 +218,15 @@ class LotReopenView(APIView):
         return Response(lot_services.lot_payload(lot, with_summary=True))
 class EventListCreateView(APIView):
     """Bitácora de un lote."""
+    @extend_schema(tags=["avicultura"])
+    def get(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        events = event_services.list_events(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+            kind=request.query_params.get("kind") or "",
+        )
+        return Response([event_services.event_payload(event) for event in events])
     @extend_schema(request=EventWriteSerializer, tags=["avicultura"])
     def post(self, request: Request, farm_id: int, lot_id: int) -> Response:
         serializer = EventWriteSerializer(data=request.data)
@@ -234,3 +243,10 @@ class EventListCreateView(APIView):
             lot_id=lot_id,
         ).get(id=event.id)
         return Response(event_services.event_payload(event), status=status.HTTP_201_CREATED)
+class AlertListView(APIView):
+    """Avisos de la finca."""
+
+    @extend_schema(tags=["avicultura"])
+    def get(self, request: Request, farm_id: int) -> Response:
+        alerts = event_services.list_alerts(user=request.user, farm_id=farm_id)
+        return Response([event_services.alert_payload(alert) for alert in alerts])

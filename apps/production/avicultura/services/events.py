@@ -36,6 +36,15 @@ NEEDS_AMOUNT = BALANCE | {
     EventKind.ALIMENTO,
 }
 COUNT_KINDS = BALANCE | {EventKind.AISLAMIENTO, EventKind.AJUSTE}
+def list_events(*, user: User, farm_id: int, lot_id: int, kind: str = ""):
+    """Bitácora de un lote, la más reciente primero."""
+    lot = _lot(user=user, farm_id=farm_id, lot_id=lot_id, write=False)
+    queryset = lot.events.select_related("created_by").prefetch_related("corrections")
+    if kind:
+        if kind not in EventKind.values:
+            raise AppError("tipo de evento no válido", 400)
+        queryset = queryset.filter(kind=kind)
+    return queryset
 def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent:
     """Anota un hecho y, si corresponde, actualiza el saldo."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -94,6 +103,10 @@ def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent
         lot.save(update_fields=["live_count"])
         _maybe_alert(lot, event)
     return event
+def list_alerts(*, user: User, farm_id: int):
+    """Avisos de la finca."""
+    require_membership(user=user, farm_id=farm_id)
+    return LotAlert.objects.filter(lot__farm_id=farm_id).select_related("lot", "house")
 def event_payload(event: LotEvent) -> dict:
     """Evento listo para la API."""
     return {

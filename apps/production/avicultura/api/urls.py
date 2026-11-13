@@ -13,6 +13,7 @@ from apps.production.avicultura.api.views import (
     LotCloseView,
     LotReopenView,
     EventListCreateView,
+    AlertListView,
 )
 
 urlpatterns = [
@@ -42,4 +43,5 @@ urlpatterns = [
         "avicultura/<int:farm_id>/lotes/<int:lot_id>/eventos/",
         EventListCreateView.as_view(),
         name="avi-events",
-    ),]
+    ),
+    path("avicultura/<int:farm_id>/alertas/", AlertListView.as_view(), name="avi-alerts"),]
