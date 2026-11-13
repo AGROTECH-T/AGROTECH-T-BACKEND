@@ -3,7 +3,7 @@
 DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py"]
 addopts = "--cov=apps.accounts --cov=apps.farms --cov=apps.trazabilidad --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
-env = ["DJANGO_DEBUG=true", "REDIS_URL="]
+env = ["DJANGO_DEBUG=true", "REDIS_URL=", "BREVO_API_KEY="]
 
 [tool.coverage.run]
 omit = ["*/migrations/*", "*/tests/*"]
@@ -19,6 +19,7 @@ select = ["E", "F", "I", "B", "S", "UP"]
 "apps/accounts/tests/*" = ["S101", "S105", "S106"]
 "apps/farms/tests/*" = ["S101"]
 "apps/inventario/tests/*" = ["S101"]
+"apps/permissions/tests/*" = ["S101"]
 "apps/trazabilidad/tests/*" = ["S101"]
 "apps/**/migrations/*" = ["E501"]
 "apps/accounts/integrations/otp_mail_body.py" = ["E501"]

@@ -3,6 +3,7 @@
 @author Cristian Deysdayr Jimenez
 """
 
+from django.middleware.csrf import rotate_token
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.request import Request
@@ -12,6 +13,7 @@ from rest_framework.views import APIView
 
 from apps.accounts.api.serializers import (
     AccountResponseSerializer,
+    LoginResponseSerializer,
     LoginSerializer,
     ProfileUpdateSerializer,
     RecoverSerializer,
@@ -20,6 +22,7 @@ from apps.accounts.api.serializers import (
     ResetSerializer,
     SuccessResponseSerializer,
     TokenResponseSerializer,
+    VerificationConfirmSerializer,
 )
 from apps.accounts.api.throttles import (
     LoginIdentifierThrottle,
@@ -27,6 +30,13 @@ from apps.accounts.api.throttles import (
     ResetIdentifierThrottle,
 )
 from apps.accounts.services import auth_service
+from apps.farms.capabilities import (
+    can_create_farms,
+    can_create_first_farm,
+    can_open_inactive_farms,
+)
+from apps.trazabilidad.models import EventType
+from apps.trazabilidad.services import record_audit_event
 
 
 class RegisterView(APIView):
@@ -54,12 +64,24 @@ class LoginView(APIView):
     throttle_classes = [ScopedRateThrottle, LoginIdentifierThrottle]
     throttle_scope = "login"
 
-    @extend_schema(request=LoginSerializer, responses={200: TokenResponseSerializer})
+    @extend_schema(request=LoginSerializer, responses={200: LoginResponseSerializer})
     def post(self, request: Request) -> Response:
-        """Entrega un JWT cifrado."""
+        """Entrega un token y abre la sesión Django."""
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        return _token_response(auth_service.login(**serializer.validated_data))
+        user, token = auth_service.login(**serializer.validated_data)
+        request.session["user_id"] = user.pk
+        request.session.cycle_key()
+        rotate_token(request)
+        record_audit_event(
+            actor=user,
+            event_type=EventType.SESSION_OPENED,
+            entity_type="Session",
+            entity_id=user.pk,
+        )
+        response = Response({"token": token, "ok": True})
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class RecoverView(APIView):
@@ -135,8 +157,50 @@ class LogoutView(APIView):
 
     @extend_schema(request=None, responses={200: SuccessResponseSerializer})
     def post(self, request: Request) -> Response:
-        """Revoca inmediatamente el token vigente."""
+        """Revoca el token vigente y destruye la sesión Django."""
+        session_user_id = request.session.get("user_id")
+        had_own_django_session = session_user_id is not None and str(session_user_id) == str(
+            request.user.pk
+        )
+        request.session.flush()
         auth_service.logout(request.user)
+        if had_own_django_session:
+            record_audit_event(
+                actor=request.user,
+                event_type=EventType.SESSION_CLOSED,
+                entity_type="Session",
+                entity_id=request.user.pk,
+            )
+        return Response({"ok": True})
+
+
+class EmailVerificationRequestView(APIView):
+    """Solicita un código de verificación de correo."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verification_request"
+
+    @extend_schema(request=None, responses={200: RecoveryResponseSerializer})
+    def post(self, request: Request) -> Response:
+        """Envía un OTP de verificación y devuelve su vigencia."""
+        wait = auth_service.request_email_verification(request.user)
+        response = Response({"ok": True, "wait": wait})
+        response["Cache-Control"] = "no-store"
+        return response
+
+
+class EmailVerificationConfirmView(APIView):
+    """Confirma el código de verificación de correo."""
+
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "verification_confirm"
+
+    @extend_schema(request=VerificationConfirmSerializer, responses={200: SuccessResponseSerializer})
+    def post(self, request: Request) -> Response:
+        """Verifica el correo consumiendo el código de verificación."""
+        serializer = VerificationConfirmSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        auth_service.verify_email(request.user, serializer.validated_data["code"])
         return Response({"ok": True})
 
 
@@ -150,6 +214,10 @@ def _account_payload(user) -> dict:
         "phone": user.phone,
         "correo": user.correo,
         "is_active": user.is_active,
+        "email_verified": user.email_verified,
+        "can_create_farms": can_create_farms(user),
+        "can_create_first_farm": can_create_first_farm(user),
+        "can_open_inactive_farms": can_open_inactive_farms(user),
     }
 
 

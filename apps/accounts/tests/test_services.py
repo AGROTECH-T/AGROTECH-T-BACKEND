@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from apps.accounts.errors import AppError
 from apps.accounts.integrations import email, sms, whatsapp
-from apps.accounts.models import LoginCode
+from apps.accounts.models import LoginCode, OTPPurpose
 from apps.accounts.services import otp_service, token_service
 
 
@@ -39,17 +39,20 @@ def test_wrong_and_expired_email_codes(user):
     """Los OTP erróneos suman intentos y los vencidos se eliminan."""
     LoginCode.objects.create(
         user=user,
+        purpose=OTPPurpose.RECOVERY,
         code_hash="wrong",
         expires_at=timezone.now() + timedelta(minutes=5),
         channel="correo",
     )
     with pytest.raises(AppError):
-        otp_service.verify_code(user, "000000")
-    assert LoginCode.objects.get(user=user).attempts == 1
-    LoginCode.objects.filter(user=user).update(expires_at=timezone.now() - timedelta(seconds=1))
+        otp_service.verify_code(user, "000000", OTPPurpose.RECOVERY)
+    assert LoginCode.objects.get(user=user, purpose=OTPPurpose.RECOVERY).attempts == 1
+    LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).update(
+        expires_at=timezone.now() - timedelta(seconds=1)
+    )
     with pytest.raises(AppError):
-        otp_service.verify_code(user, "000000")
-    assert not LoginCode.objects.filter(user=user).exists()
+        otp_service.verify_code(user, "000000", OTPPurpose.RECOVERY)
+    assert not LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()
 
 
 @override_settings(DEFAULT_FROM_EMAIL="sender@example.com")
@@ -139,7 +142,8 @@ def test_phone_code_is_checked_locally(user, monkeypatch, channel):
         f"apps.accounts.services.otp_service.{channel}.send_code",
         lambda *args: None,
     )
-    otp_service.request_code(user, channel)
-    assert LoginCode.objects.get(user=user).code_hash != "twilio-verify"
-    otp_service.verify_code(user, "123456")
-    assert not LoginCode.objects.filter(user=user).exists()
+    otp_service.request_code(user, channel, OTPPurpose.RECOVERY)
+    record = LoginCode.objects.get(user=user, purpose=OTPPurpose.RECOVERY)
+    assert record.code_hash != "twilio-verify"
+    otp_service.verify_code(user, "123456", OTPPurpose.RECOVERY)
+    assert not LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()

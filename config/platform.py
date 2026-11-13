@@ -8,6 +8,8 @@ import os
 
 from django.core.exceptions import ImproperlyConfigured
 
+from config.frontend_url import normalize_frontend_url
+
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 FIVE_REQUESTS_PER_HOUR = "5/hour"
 
@@ -39,7 +41,8 @@ CACHES = {
 REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.accounts.exceptions.api_exception_handler",
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "apps.accounts.api.authentication.JWEAuthentication"
+        "apps.accounts.api.authentication.JWEAuthentication",
+        "apps.accounts.api.authentication.SessionCookieAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
@@ -55,6 +58,12 @@ REST_FRAMEWORK = {
         "reset": "10/hour",
         "reset_account": FIVE_REQUESTS_PER_HOUR,
         "renew": "30/minute",
+        "verification_request": FIVE_REQUESTS_PER_HOUR,
+        "verification_confirm": "10/minute",
+        "invitation_create": "30/hour",
+        "invitation_resend": "10/hour",
+        "invitation_accept": "10/hour",
+        "invitation_accept_ip": "30/hour",
     },
     "UNAUTHENTICATED_USER": None,
 }
@@ -71,7 +80,12 @@ PASSWORD_HASHERS = [
 ]
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+SESSION_COOKIE_AGE = 86400
 SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_HTTPONLY = True
 CSRF_COOKIE_SECURE = not DEBUG
 SECURE_SSL_REDIRECT = not DEBUG
 SECURE_HSTS_SECONDS = 31_536_000 if not DEBUG else 0
@@ -86,6 +100,14 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv("SMTP_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 DEFAULT_FROM_EMAIL = os.getenv("SMTP_FROM", "")
+
+FRONTEND_URL = normalize_frontend_url(os.getenv("FRONTEND_URL"), debug=DEBUG)
+
+# Clave HMAC independiente de los códigos de invitación (F10.3.1). Sin valor por
+# defecto ni alternativa. config.settings la valida al arrancar en producción
+# (config.invitation_code_key, F10.3.2); apps.farms.invitation_codes falla de
+# forma cerrada al usarla si falta.
+INVITATION_CODE_HMAC_KEY = os.getenv("INVITATION_CODE_HMAC_KEY", "")
 
 LOGGING = {
     "version": 1,

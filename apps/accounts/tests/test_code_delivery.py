@@ -13,7 +13,7 @@ from rest_framework.test import APIClient
 
 from apps.accounts.errors import AppError
 from apps.accounts.integrations import sms
-from apps.accounts.models import LoginCode
+from apps.accounts.models import LoginCode, OTPPurpose
 from apps.accounts.services import otp_service
 
 
@@ -21,9 +21,9 @@ from apps.accounts.services import otp_service
 def test_resend_waits_ten_seconds(user, monkeypatch):
     """Un segundo envío inmediato pide esperar."""
     monkeypatch.setattr("apps.accounts.integrations.email.send_code", lambda *args: None)
-    otp_service.request_code(user, "correo")
+    otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
     with pytest.raises(AppError) as error:
-        otp_service.request_code(user, "correo")
+        otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
     assert error.value.status_code == 429
 
 
@@ -36,13 +36,15 @@ def test_new_code_replaces_the_previous_one(user, monkeypatch):
         lambda _: next(codes),
     )
     monkeypatch.setattr("apps.accounts.integrations.email.send_code", lambda *args: None)
-    otp_service.request_code(user, "correo")
-    LoginCode.objects.filter(user=user).update(sent_at=timezone.now() - timedelta(seconds=11))
-    otp_service.request_code(user, "correo")
+    otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
+    LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).update(
+        sent_at=timezone.now() - timedelta(seconds=11)
+    )
+    otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
     with pytest.raises(AppError):
-        otp_service.verify_code(user, "111111")
-    otp_service.verify_code(user, "222222")
-    assert not LoginCode.objects.filter(user=user).exists()
+        otp_service.verify_code(user, "111111", OTPPurpose.RECOVERY)
+    otp_service.verify_code(user, "222222", OTPPurpose.RECOVERY)
+    assert not LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()
 
 
 @pytest.mark.django_db
@@ -50,11 +52,11 @@ def test_check_keeps_the_code_until_reset(user, monkeypatch):
     """La comprobación no gasta el código. El cambio de clave sí."""
     monkeypatch.setattr("apps.accounts.services.otp_service.secrets.randbelow", lambda _: 123456)
     monkeypatch.setattr("apps.accounts.integrations.email.send_code", lambda *args: None)
-    otp_service.request_code(user, "correo")
-    otp_service.check_code(user, "123456")
-    assert LoginCode.objects.filter(user=user).exists()
-    otp_service.verify_code(user, "123456")
-    assert not LoginCode.objects.filter(user=user).exists()
+    otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
+    otp_service.check_code(user, "123456", OTPPurpose.RECOVERY)
+    assert LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()
+    otp_service.verify_code(user, "123456", OTPPurpose.RECOVERY)
+    assert not LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()
 
 
 @pytest.mark.django_db
@@ -62,14 +64,14 @@ def test_confirm_endpoint_keeps_the_code(user, monkeypatch):
     """La ruta de comprobación responde éxito y no borra el código."""
     monkeypatch.setattr("apps.accounts.services.otp_service.secrets.randbelow", lambda _: 123456)
     monkeypatch.setattr("apps.accounts.integrations.email.send_code", lambda *args: None)
-    otp_service.request_code(user, "correo")
+    otp_service.request_code(user, "correo", OTPPurpose.RECOVERY)
     response = APIClient().post(
         "/api/v1/auth/password/confirm/",
         {"identification": user.identification, "code": "123456"},
         format="json",
     )
     assert response.status_code == 200
-    assert LoginCode.objects.filter(user=user).exists()
+    assert LoginCode.objects.filter(user=user, purpose=OTPPurpose.RECOVERY).exists()
 
 
 def test_brevo_explains_an_unknown_ip(monkeypatch):

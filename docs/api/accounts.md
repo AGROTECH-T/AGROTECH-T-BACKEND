@@ -27,7 +27,19 @@ Documentación interactiva: `/api/schema/` y `/api/docs/`.
 
 - `201`: `{"ok": true}`
 - `400`: campos o contraseña inválidos
-- `409`: identificación ya registrada
+- `409`: identificación ya registrada, o `{"error": "ese correo ya está registrado"}`
+  si otra cuenta usa el mismo correo (se compara sin mayúsculas ni espacios
+  exteriores; una cuenta por correo, F10.2)
+- `503`: `{"error": "no pudimos completar la operación; inténtalo de nuevo"}` si
+  otra solicitud con el mismo correo está en curso y no terminó en 5 segundos
+
+Unicidad del correo: la garantía es **de aplicación**. El registro y el cambio de
+correo comprueban y escriben bajo un bloqueo con nombre de MariaDB (`GET_LOCK`)
+por huella del correo normalizado, de modo que dos solicitudes simultáneas no se
+intercalan. La base de datos **no** tiene todavía una restricción única sobre
+`users.correo`; escrituras que no pasen por estos servicios no están protegidas.
+La restricción única requiere una auditoría de duplicados y una migración, ambas
+pendientes de autorización.
 
 ## Iniciar sesión
 
@@ -51,6 +63,30 @@ La respuesta incluye `Cache-Control: no-store`. El token es un JWE A256GCM con e
 `GET /auth/me/`
 
 Requiere `Authorization: Bearer <token>`. Un token rotado, revocado o vencido responde `401`.
+
+Además de los datos visibles incluye, solo lectura: `email_verified`,
+`can_create_farms` (cuenta activa, correo verificado y capacidad global),
+`can_create_first_farm` (puede crear su primera finca por la excepción de
+onboarding, F10.2; consultarlo no concede nada) y `can_open_inactive_farms`.
+
+`PATCH /auth/me/` responde `409 {"error": "ese correo ya está registrado"}` si el
+correo nuevo pertenece a otra cuenta; la cuenta no cambia.
+
+La interfaz restaura la sesión al recargar consultando este endpoint con el
+token de la pestaña, y la renueva con `POST /auth/session/renew/` solo mientras
+hay actividad (cada 5 minutos como mínimo; el TTL no se expone al cliente).
+
+Renovación (comportamiento existente del backend): `renew` invalida el token
+presentado en el acto y entrega uno nuevo con la vigencia completa; solo funciona
+antes de que el token venza. En la interfaz (F10.2-CORRECCIONES):
+- una solicitud que salió con el token anterior y recibe `401 "la sesion
+  vencio"` se reintenta una sola vez con el token vigente de la pestaña (la
+  autenticación falla antes de ejecutar la vista, así que no tuvo efectos);
+  otros `401`, como un código de verificación incorrecto, no se reintentan;
+- dos pestañas con el mismo token inicial (pestaña duplicada) comparten una
+  sola sesión del servidor: la primera que renueva la conserva y la otra recibe
+  `401` y vuelve al acceso. Sincronizarlas exigiría compartir el token entre
+  pestañas o una gracia para el token anterior en el servidor; no se implementó.
 
 ## Cerrar sesión
 

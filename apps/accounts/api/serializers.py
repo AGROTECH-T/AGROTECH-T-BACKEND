@@ -91,6 +91,12 @@ class ConfirmSerializer(serializers.Serializer):
         return normalize_identification(value)
 
 
+class VerificationConfirmSerializer(serializers.Serializer):
+    """Valida el código de verificación de correo."""
+
+    code = serializers.RegexField(r".*\d{6}.*", max_length=30)
+
+
 class ResetSerializer(serializers.Serializer):
     """Valida el OTP y la contraseña nueva."""
 
@@ -113,6 +119,18 @@ class TokenResponseSerializer(serializers.Serializer):
     token = serializers.CharField()
 
 
+class LoginResponseSerializer(TokenResponseSerializer):
+    """Documenta la respuesta de login con token y confirmación."""
+
+    ok = serializers.BooleanField()
+
+
+class CSRFTokenResponseSerializer(serializers.Serializer):
+    """Documenta la respuesta que contiene el token CSRF."""
+
+    token = serializers.CharField()
+
+
 class AccountResponseSerializer(serializers.Serializer):
     """Documenta los datos visibles de la cuenta autenticada."""
 
@@ -123,6 +141,10 @@ class AccountResponseSerializer(serializers.Serializer):
     phone = serializers.CharField()
     correo = serializers.EmailField()
     is_active = serializers.BooleanField()
+    email_verified = serializers.BooleanField(read_only=True)
+    can_create_farms = serializers.BooleanField(read_only=True)
+    can_create_first_farm = serializers.BooleanField(read_only=True)
+    can_open_inactive_farms = serializers.BooleanField(read_only=True)
 
 
 class SuccessResponseSerializer(serializers.Serializer):

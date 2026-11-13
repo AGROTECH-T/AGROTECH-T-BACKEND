@@ -86,6 +86,34 @@ def test_login_renew_me_and_logout(client, user):
 
 
 @pytest.mark.django_db
+def test_me_exposes_email_verified_read_only(client, user):
+    """/auth/me expone email_verified y el PATCH no permite cambiarlo."""
+    login = client.post(
+        "/api/v1/auth/login/",
+        {"identification": user.identification, CREDENTIAL_FIELD: VALID_CREDENTIAL},
+        format="json",
+    )
+    auth = f"Bearer {login.data['token']}"
+    user.email_verified = False
+    user.save(update_fields=["email_verified"])
+
+    pending = client.get("/api/v1/auth/me/", HTTP_AUTHORIZATION=auth)
+    attempt = client.patch(
+        "/api/v1/auth/me/", {"email_verified": True}, format="json", HTTP_AUTHORIZATION=auth
+    )
+    user.refresh_from_db()
+    assert pending.status_code == 200
+    assert pending.data["email_verified"] is False
+    assert user.email_verified is False
+    assert attempt.data.get("email_verified") is not True
+
+    user.email_verified = True
+    user.save(update_fields=["email_verified"])
+    verified = client.get("/api/v1/auth/me/", HTTP_AUTHORIZATION=auth)
+    assert verified.data["email_verified"] is True
+
+
+@pytest.mark.django_db
 def test_login_rejects_invalid_credentials(client, user):
     """El acceso responde un error genérico para credenciales inválidas."""
     response = client.post(
