@@ -12,7 +12,13 @@ from django.db.models import QuerySet
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
-from apps.inventario.models import MagnitudeNature, Movement, MovementKind, Product
+from apps.inventario.models import (
+    AdjustmentReason,
+    MagnitudeNature,
+    Movement,
+    MovementKind,
+    Product,
+)
 from apps.inventario.services.membership import require_membership
 from apps.inventario.services.permissions import ADJUST, READ, WRITE_STOCK, require_action
 
@@ -27,12 +33,14 @@ def register_movement(
     kind: str,
     quantity: Decimal | None = None,
     note: str = "",
+    reason: str = "",
     take_all: bool = False,
     idempotency_key: str = "",
 ) -> Movement:
     """Aplica un movimiento y actualiza el stock del producto."""
     if kind not in MovementKind.values:
         raise AppError("tipo de movimiento inválido", 400)
+    clean_reason = _reason(kind, reason)
 
     membership = require_membership(user=user, farm_id=farm_id)
     if kind == MovementKind.AJUSTE:
@@ -97,6 +105,7 @@ def register_movement(
                 stock_before=stock_before,
                 stock_after=stock_after,
                 note=clean_note,
+                reason=clean_reason,
                 created_by=user,
                 membership=membership,
                 idempotency_key=clean_key,
@@ -212,3 +221,15 @@ def _next_quantity(current: Decimal, kind: str, amount: Decimal) -> Decimal:
     if kind == MovementKind.SALIDA:
         return current - amount
     return amount
+
+
+def _reason(kind: str, reason: str) -> str:
+    """Motivo del ajuste; vacío en entradas y salidas."""
+    clean = (reason or "").strip()
+    if kind != MovementKind.AJUSTE:
+        return ""
+    if not clean:
+        return ""
+    if clean not in AdjustmentReason.values:
+        raise AppError("motivo de ajuste inválido", 400)
+    return clean
