@@ -20,6 +20,16 @@ def farm_id(user) -> int:
     return create_farm(user=user, name="La Esperanza").farm_id
 def _galpon(user, farm_id: int, name: str = "Galpón 1", **data):
     return house_services.create_house(user=user, farm_id=farm_id, name=name, **data)
+def _lote(user, farm_id: int, house_id: int, code: str = "L-001", received: int = 100):
+    return lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house_id,
+        code=code,
+        arrived_at=timezone.now(),
+        received=received,
+        receiver_name="Ana Pérez",
+    )
 @pytest.mark.django_db
 def test_crea_galpon_y_calcula_area(user, farm_id):
     """El área sale del largo y el ancho; el sistema no inventa cifras."""
@@ -61,6 +71,33 @@ def test_permiso_directo_permite_registrar(user, make_user, farm_id):
     FarmPermission.objects.create(membership=membership, permission=REGISTRAR_GALPON)
     house = _galpon(reader, farm_id, name="Delegado")
     assert house.name == "Delegado"
+@pytest.mark.django_db
+def test_abrir_lote_ocupa_el_galpon(user, farm_id):
+    """La recepción deja el galpón ocupado y el saldo vivo descuenta bajas."""
+    house = _galpon(user, farm_id)
+    lot = lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        code="L-010",
+        arrived_at=timezone.now(),
+        received=130,
+        dead_on_arrival=2,
+        discarded_on_arrival=1,
+        receiver_name="Ana Pérez",
+    )
+    house.refresh_from_db()
+    assert lot.live_count == 127
+    assert house.status == HouseStatus.OCUPADO
+@pytest.mark.django_db
+def test_codigo_de_lote_unico(user, farm_id):
+    """El código no se repite en la finca."""
+    house = _galpon(user, farm_id)
+    _lote(user, farm_id, house.id, code="L-001")
+    other = _galpon(user, farm_id, name="Galpón 2")
+    with pytest.raises(AppError) as error:
+        _lote(user, farm_id, other.id, code="L-001")
+    assert error.value.status_code == 409
 @pytest.mark.django_db
 def test_actualiza_y_borra_un_galpon(user, farm_id):
     """Se puede cambiar el nombre y luego quitar el galpón."""

@@ -8,6 +8,7 @@ from django.urls import path
 from apps.production.avicultura.api.views import (
     HouseListCreateView,
     HouseDetailView,
+    LotListCreateView,
 )
 
 urlpatterns = [
@@ -16,4 +17,5 @@ urlpatterns = [
         "avicultura/<int:farm_id>/galpones/<int:house_id>/",
         HouseDetailView.as_view(),
         name="avi-house",
-    ),]
+    ),
+    path("avicultura/<int:farm_id>/lotes/", LotListCreateView.as_view(), name="avi-lots"),]
