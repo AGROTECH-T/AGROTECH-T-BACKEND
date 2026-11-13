@@ -5,6 +5,26 @@ alwaysApply: true
 
 # Reglas transversales
 
+Base genérica (todos los proyectos): skill OpenCode `desarrollo-obligatorio`
+en `.opencode/skills/desarrollo-obligatorio/SKILL.md`
+(narrar qué haces, código humano, confirmar commit y deploy).
+
+Contexto de producto AGROTECH-T: skill `agrotech-t`
+en `.opencode/skills/agrotech-t/SKILL.md`.
+
+## Comunicación
+
+- Decir siempre qué se está haciendo en ese momento.
+
+## Confirmación
+
+- **No** pedir confirmación para editar código, crear archivos, tests, rebuild Docker
+  local, ni trabajo rutinario: ejecutar y narrar qué se hace.
+- Pedir confirmación **solo** ante acciones graves o irreversibles:
+  borrar/resetear base de datos, desplegar a producción, push a remoto,
+  force push, o borrar datos/volumenes de forma permanente.
+- Commit local: preparar y pedir un sí breve solo si el usuario no lo ordenó ya.
+
 ## Seguridad
 
 - No subir secretos, tokens, claves ni contraseñas.
@@ -13,24 +33,34 @@ alwaysApply: true
 ## Cabeceras
 
 - No colocar en la cabecera la fecha en que se creó el archivo.
+- `@author Cristian Deysdayr Jimenez` **solo** en archivos **nuevos** que cree este
+  autor (trabajo propio).
+- Si el archivo lo hizo **otra persona** y solo se modifica: actualizar el código
+  y **nada más**. No agregar, cambiar ni reemplazar `@author`. No atribuir
+  autoría ajena a Cristian.
 
-## Diseño
+## Código (estilo humano, obligatorio)
 
-- Aplicar POO, SOLID y especialmente responsabilidad única.
-- Reutilizar código existente y evitar cualquier duplicación.
-- Usar Repository solo si desacopla persistencia o consultas complejas.
-- Usar Factory cuando existan variantes reales de construcción.
-- Evitar Singleton manual; respetar el ciclo de vida administrado por Django.
-- Usar Observer para eventos explícitos, sin cadenas ocultas de señales.
+- Escribir **como lo haría un desarrollador humano**: claro, natural, fácil de leer.
+- Nombres que se entiendan en voz alta (`crearFinca`, no `fn1` / `x2`).
+- Funciones cortas con un solo propósito; sin magia ni over-engineering.
+- Evitar one-liners crípticos, abstracciones prematuras y “código de generador”.
+- Comentarios solo cuando el *porqué* no sea obvio; no narrar lo evidente.
+- Misma voz y estilo que el código ya existente en el repo.
+- Aplicar POO, SOLID (sobre todo S) y DRY; ≤150 líneas por archivo.
+- Repository / Factory / Observer / Singleton solo si aportan de verdad.
+- Respetar el ciclo de vida de Django; sin singletons manuales.
 
 ## Frontend
 
 - Aplicar HTML semántico al trabajar en frontend o plantillas.
+- UI en español; tokens de `tokens.css`; no inventar features no pedidas.
 
 ## Despliegue
 
 - Hacer cada cambio primero en local y comprobarlo ahí.
-- Pasar a producción solo después de que el cambio local esté listo.
+- Pasar a producción solo después de que el cambio local esté listo y confirmado.
+- Clear cache de Render no borra la base de datos.
 
 ## Git
 
@@ -38,6 +68,8 @@ alwaysApply: true
 - Cada commit debe representar un único cambio lógico.
 - Formato: `tipo(ámbito): mensaje imperativo`, máximo 60 caracteres.
 - El cuerpo opcional explica por qué, separado por una línea en blanco.
-- No hacer commit ni push salvo solicitud expresa.
+- Push / deploy: solo con confirmación explícita.
+- Commit local: si el usuario lo pide, hacerlo; si no, preguntar una vez al cerrar el cambio.
+- Sin atribución de IA en commits.
 - Avisos Sonar/lint/ruff del código recién implementado van **en el mismo commit**
   de esa funcionalidad; nunca un commit aparte solo por el arreglo.

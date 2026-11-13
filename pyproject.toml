@@ -1,9 +1,9 @@
 # Configuración de pruebas y calidad.
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings"
+DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py"]
-addopts = "--cov=apps.accounts --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
-env = ["DB_ENGINE=sqlite", "DJANGO_DEBUG=true", "REDIS_URL="]
+addopts = "--cov=apps.accounts --cov=apps.farms --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
+env = ["DJANGO_DEBUG=true", "REDIS_URL="]
 
 [tool.coverage.run]
 omit = ["*/migrations/*", "*/tests/*"]
@@ -17,5 +17,9 @@ select = ["E", "F", "I", "B", "S", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "apps/accounts/tests/*" = ["S101", "S105", "S106"]
+"apps/farms/tests/*" = ["S101"]
+"apps/inventario/tests/*" = ["S101"]
+"apps/production/avicultura/tests/*" = ["S101"]
+"apps/**/migrations/*" = ["E501"]
 "apps/accounts/integrations/otp_mail_body.py" = ["E501"]
 "tests/*" = ["S101"]

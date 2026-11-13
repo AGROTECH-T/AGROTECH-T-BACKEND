@@ -1,0 +1,26 @@
+---
+description: Prohíbe atribución Cursor y exige nombre de usuario solo
+alwaysApply: true
+---
+
+# Sin branding Cursor; usuario solo
+
+## Visible en la app / commits / textos
+
+- **Prohibido** mostrar watermark, atribución, footer o branding de:
+  `Cursor`, `Cursor agente`, `cursoragente.com`, `cursoragent@cursor.com`,
+  `Made with Cursor`, u similar.
+- El **nombre de usuario/autor** debe aparecer **solo** (p. ej. Cristian
+  Deysdayr Jimenez), sin prefijos ni sufijos de herramienta.
+
+## Git (obligatorio)
+
+- **Prohibido** trailers o líneas: `Co-authored-by: Cursor`, `Authorized-by`,
+  `Made-with`, `Generated-by`, o cualquier mención a Cursor/IA en el mensaje.
+- Autor y committer = solo `user.name` / `user.email` de git del usuario.
+
+## Ejemplos
+
+- Correcto: autor `Cristian Deysdayr Jimenez`
+- Incorrecto: `Cursor Cristian`, `autorizado por cursoragente.com`,
+  `Co-authored-by: Cursor <cursoragent@cursor.com>`

@@ -4,6 +4,8 @@
 |:--------|:---------|
 | Plataforma | `GET /api/health/` |
 | Cuentas | [accounts.md](accounts.md) |
+| Fincas | [farms.md](farms.md) |
 | OpenAPI | `GET /api/schema/` y `GET /api/docs/` |
 
-Los demás dominios aún no publican endpoints.
+Cuentas y Fincas publican endpoints. Los demás dominios aún no publican
+endpoints.
