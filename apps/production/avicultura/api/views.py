@@ -34,6 +34,10 @@ class HouseWriteSerializer(serializers.Serializer):
     mortality_alert = serializers.IntegerField(required=False, allow_null=True)
 class HouseListCreateView(APIView):
     """Galpones de la finca."""
+    @extend_schema(tags=["avicultura"])
+    def get(self, request: Request, farm_id: int) -> Response:
+        houses = house_services.list_houses(user=request.user, farm_id=farm_id)
+        return Response([house_services.house_payload(house) for house in houses])
     @extend_schema(
         request=HouseWriteSerializer,
         responses={201: HouseWriteSerializer},
