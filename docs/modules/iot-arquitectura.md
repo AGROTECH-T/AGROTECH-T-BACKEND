@@ -100,8 +100,11 @@ React (web) ◀──REST/HTTPS── Django API ◀── MariaDB ◀── Con
 | Trama | (`coordinator_uid`, `boot_counter`, `seq`) | Identidad única de cada trama; base de la deduplicación. |
 
 La MAC del ESP32 **no** se usa como identidad: puede falsificarse y cambia si se
-reemplaza la placa. Puede registrarse como dato informativo. El formato exacto
-de los identificadores (longitud, alfabeto) queda pendiente (P-IOT-03).
+reemplaza la placa. Puede registrarse como dato informativo. Formato definido en
+IoT-02.1: `GW-`, `CO-` o `SN-` + 10 caracteres sin ambigüedades
+(`apps/iot/identifiers.py`, [DEC-13 §10](../decisions/DEC-13-arquitectura-iot.md)).
+El coordinador es un dispositivo sin conectividad IP: su `CO-…` solo viaja
+dentro de la trama LoRa; el `GW-…` del gateway es además su usuario MQTT.
 
 ### 3.6 Relación futura con avicultura
 

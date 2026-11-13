@@ -3,8 +3,9 @@
 - **Identificador:** DEC-13
 - **Título:** Arquitectura y contratos técnicos del módulo IoT
 - **Estado de decisión:** Aprobada (parcial: los puntos de §6 siguen pendientes)
-- **Estado de implementación:** Diseñada. Sin código.
-- **Alcance:** BUILD IoT-01
+- **Estado de implementación:** Parcial. IoT-02.1 implementa catálogo,
+  identificadores y exigencia de MariaDB (§10); sin modelos ni migraciones.
+- **Alcance:** BUILD IoT-01, IoT-02.1
 - **Fecha:** 2026-11-12
 - **Relación:** DEC-01 (desactivación lógica de fincas), DEC-02 (roles por
   membresía), DEC-11 (capacidades por finca)
@@ -74,8 +75,8 @@ implementarse, pero son la base de IoT-02.
 | ID | Pendiente | Bloquea |
 |---|---|---|
 | P-IOT-01 | Ubicación del broker y del backend (en la finca o en la nube) | IoT-06 |
-| P-IOT-02 | Cómo imponer "solo MariaDB" frente a la rama Postgres de `config/database.py` | IoT-02 |
-| P-IOT-03 | Formato de `gateway_uid` y `coordinator_uid` | IoT-02 |
+| P-IOT-02 | ~~Cómo imponer "solo MariaDB"~~ **Resuelto en IoT-02.1:** `apps/iot/db_guard.require_mariadb` en los servicios IoT, sin cambiar la configuración global (§10) | — |
+| P-IOT-03 | ~~Formato de identificadores~~ **Resuelto en IoT-02.1:** `GW-`, `CO-`, `SN-` + 10 caracteres (§10) | — |
 | P-IOT-04 | Significado de "grupo de sensores" y si viaja en la trama | IoT-02 |
 | P-IOT-05 | Parámetros de radio y cumplimiento normativo en Colombia | Firmware |
 | P-IOT-06 | Estructura binaria de la trama, tamaño máximo y codificación de valores | IoT-04 |
@@ -97,10 +98,10 @@ implementarse, pero son la base de IoT-02.
 | P-IOT-22 | Periodo de transición en rotaciones de clave | IoT-03 |
 | P-IOT-23 | Cifrado de flash y arranque seguro del ESP32 | Firmware |
 | P-IOT-24 | Autenticación de Mosquitto y certificados TLS en el ESP32 | IoT-06 |
-| P-IOT-25 | Coordinador ligado a un gateway o a cualquier gateway de su finca | IoT-02 |
+| P-IOT-25 | ~~Coordinador ligado a uno o varios gateways~~ **Resuelto (aprobación IoT-02):** varios gateways autorizados de su misma finca | — |
 | P-IOT-26 | Marca de agua por coordinador si existe retención | IoT-04 |
 | P-IOT-27 | Modelo de deduplicación (opción A o B) | IoT-04 |
-| P-IOT-28 | Tipos de métrica, unidades, rangos y precisión | IoT-02 |
+| P-IOT-28 | Rangos y precisión por métrica. Métricas iniciales y unidades **resueltas en IoT-02.1**: `temperature` (°C) y `relative_humidity` (%) | IoT-04 |
 | P-IOT-29 | Retención y agregación de históricos | IoT-08 |
 
 ## 7. Riesgos
@@ -132,5 +133,51 @@ implementarse, pero son la base de IoT-02.
 
 ## 9. Brechas de implementación
 
-Todo: no existen modelos, servicios, consumidor, configuración de Mosquitto ni
-firmware. La implementación empieza en IoT-02 con autorización.
+No existen modelos, migraciones, servicios de administración, consumidor,
+configuración de Mosquitto ni firmware. IoT-02.1 solo aporta los componentes
+de §10.
+
+## 10. Implementación IoT-02.1
+
+| Componente | Archivo | Qué hace |
+|---|---|---|
+| Catálogo de métricas | `apps/iot/catalog.py` | Define `temperature` (°C, temperatura) y `relative_humidity` (%, proporción); `is_known_metric`, `get_metric`, `metric_unit`; rechaza códigos desconocidos con `UnknownMetricError` |
+| Identificadores públicos | `apps/iot/identifiers.py` | `generate_identifier`, `is_valid_identifier` (estricta), `normalize_identifier` (espacios y mayúsculas); `IdentifierKind` GW/CO/SN |
+| Exigencia de MariaDB | `apps/iot/db_guard.py` | `require_mariadb()` lanza `ImproperlyConfigured` si `vendor != "mysql"` o `mysql_is_mariadb` no es `True` |
+
+Especificación:
+
+- **Identificadores:** prefijo `GW-`, `CO-` o `SN-` + 10 caracteres del alfabeto
+  `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (31 símbolos, sin `0 O 1 I L`; mismo
+  conjunto que `CODE_ALPHABET` de las invitaciones, declarado como constante
+  propia para que el formato persistido no dependa de otro módulo). Longitud
+  total 13. Generación con `secrets.choice`. La unicidad definitiva será una
+  restricción `UNIQUE` en MariaDB (IoT-02.2); ante colisión la persistencia
+  reintentará hasta `MAX_GENERATION_ATTEMPTS = 5` veces. Un identificador
+  nunca se reasigna.
+- **Unidad:** se deriva siempre de la métrica; no se almacenará por separado.
+- **MariaDB:** la guarda no se ejecuta al importar ni en `IotConfig.ready()`;
+  el backend sigue arrancando sobre otros motores. Solo bloquea operaciones IoT
+  cuando la invoquen los servicios de escritura y el consumidor. A diferencia de
+  `auth_service` (que omite un bloqueo fuera de MariaDB), IoT falla de forma
+  cerrada.
+
+Explicación sencilla:
+
+- **Catálogo:** una lista fija, escrita en el código, de lo que un sensor puede
+  medir y en qué unidad. Si alguien pide una métrica que no está en la lista, el
+  sistema la rechaza en lugar de inventarla.
+- **Identificador público:** el "nombre de matrícula" de cada aparato, por
+  ejemplo `GW-7K3M9QXT2A`. Se muestra al usuario, se graba en el dispositivo y
+  viaja en los mensajes, sin revelar el número interno de la base de datos ni
+  cuántos aparatos existen.
+- **`secrets`:** el módulo de Python para valores que deben ser imposibles de
+  adivinar. `random` sirve para simulaciones, pero sus resultados pueden
+  predecirse.
+- **Exigir MariaDB:** antes de guardar algo de IoT, el sistema comprueba que la
+  base sea MariaDB. Si no lo es, se detiene con un error claro en lugar de
+  guardar datos con reglas de integridad incompletas. El resto del backend no
+  se ve afectado.
+
+Pruebas: `apps/iot/tests/test_catalog.py`, `test_identifiers.py`,
+`test_db_guard.py` (unitarias, sin base de datos).
