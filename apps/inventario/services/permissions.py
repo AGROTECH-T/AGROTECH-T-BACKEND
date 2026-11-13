@@ -1,10 +1,12 @@
-"""Permisos de inventario según el rol de membresía.
+"""Permisos de inventario según el rol de membresía y sus permisos directos.
 
-Propósito: reutilizar roles de farms sin inventar roles nuevos.
+Propósito: traducir cada acción del inventario a un permiso del catálogo.
+Contexto: un permiso directo puede sumar una acción que el rol no traía.
 @author Cristian Deysdayr Jimenez
 """
 from apps.accounts.errors import AppError
-from apps.farms.models import FarmMembership, FarmRole
+from apps.farms import permissions as farm_permissions
+from apps.farms.models import FarmMembership
 
 READ = "read"
 WRITE_STOCK = "write_stock"
@@ -12,21 +14,17 @@ ADJUST = "adjust"
 MANAGE_PRODUCT = "manage_product"
 CREATE_UNIT = "create_unit"
 
-_ROLE_ACTIONS = {
-    FarmRole.CONSULTA: {READ},
-    FarmRole.OPERADOR: {READ, WRITE_STOCK, CREATE_UNIT},
-    FarmRole.ADMINISTRADOR: {
-        READ,
-        WRITE_STOCK,
-        ADJUST,
-        MANAGE_PRODUCT,
-        CREATE_UNIT,
-    },
+_ACCION_A_PERMISO = {
+    READ: farm_permissions.VER_INVENTARIO,
+    WRITE_STOCK: farm_permissions.REGISTRAR_MOVIMIENTOS,
+    ADJUST: farm_permissions.AJUSTAR_STOCK,
+    MANAGE_PRODUCT: farm_permissions.GESTIONAR_PRODUCTOS,
+    CREATE_UNIT: farm_permissions.CREAR_UNIDADES,
 }
 
 
 def require_action(membership: FarmMembership, action: str) -> None:
-    """Exige que el rol de la membresía permita la acción."""
-    allowed = _ROLE_ACTIONS.get(membership.role, set())
-    if action not in allowed:
+    """Exige que el rol o un permiso directo permita la acción."""
+    permiso = _ACCION_A_PERMISO[action]
+    if not farm_permissions.tiene_permiso(membership, permiso):
         raise AppError("no tienes permiso para esta acción", 403)
