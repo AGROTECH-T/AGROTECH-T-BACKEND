@@ -1,12 +1,14 @@
-"""Bitácora del lote.
+﻿"""Bitácora del lote.
 
 Propósito: registrar hechos, corregirlos sin borrar el dato anterior
 y mover el saldo solo con bajas, salidas o ajustes justificados.
 @author Cristian Deysdayr Jimenez
 """
 from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
+
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.production.avicultura.models import (
@@ -26,6 +28,7 @@ from apps.production.avicultura.services.access import (
     require_write,
 )
 from apps.production.avicultura.services.houses import decimal_text
+
 BALANCE = {EventKind.MORTALIDAD, EventKind.DESCARTE, EventKind.SALIDA}
 NEEDS_AMOUNT = BALANCE | {
     EventKind.AISLAMIENTO,
@@ -36,6 +39,8 @@ NEEDS_AMOUNT = BALANCE | {
     EventKind.ALIMENTO,
 }
 COUNT_KINDS = BALANCE | {EventKind.AISLAMIENTO, EventKind.AJUSTE}
+
+
 def list_events(*, user: User, farm_id: int, lot_id: int, kind: str = ""):
     """Bitácora de un lote, la más reciente primero."""
     lot = _lot(user=user, farm_id=farm_id, lot_id=lot_id, write=False)
@@ -45,6 +50,8 @@ def list_events(*, user: User, farm_id: int, lot_id: int, kind: str = ""):
             raise AppError("tipo de evento no válido", 400)
         queryset = queryset.filter(kind=kind)
     return queryset
+
+
 def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent:
     """Anota un hecho y, si corresponde, actualiza el saldo."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -103,10 +110,98 @@ def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent
         lot.save(update_fields=["live_count"])
         _maybe_alert(lot, event)
     return event
+
+
+def correct_event(*, user: User, farm_id: int, event_id: int, **data) -> LotEvent:
+    """Guarda el valor anterior y aplica la corrección."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_write(membership)
+    reason = _required(data.get("reason"), "el motivo de la corrección")
+    with transaction.atomic():
+        event = (
+            LotEvent.objects.select_for_update()
+            .select_related("lot", "lot__house")
+            .filter(id=event_id, lot__farm_id=farm_id)
+            .first()
+        )
+        if event is None:
+            raise AppError("evento no encontrado", 404)
+        lot = Lot.objects.select_for_update().get(id=event.lot_id)
+        if lot.status != LotStatus.ABIERTO:
+            raise AppError("el lote está cerrado", 400)
+        previous = _snapshot(event)
+        if event.kind in BALANCE or event.kind == EventKind.AJUSTE:
+            _undo(lot, event)
+        if "observed_value" in data:
+            event.observed_value = data["observed_value"]
+        if data.get("notes") is not None:
+            event.notes = data["notes"].strip()
+        if data.get("payload") is not None:
+            event.payload = data["payload"]
+        if "estimated" in data:
+            event.estimated = bool(data["estimated"])
+        if "confirmed" in data:
+            event.confirmed = bool(data["confirmed"])
+        _check_payload(
+            event.kind,
+            event.observed_value,
+            event.notes,
+            event.payload,
+            event.confirmed,
+        )
+        if event.kind == EventKind.AISLAMIENTO:
+            _check_isolation(lot, event.observed_value, event.payload, exclude_id=event.id)
+        _move_stock(lot, event.kind, event.observed_value, event.payload, event.notes)
+        event.save()
+        lot.save(update_fields=["live_count"])
+        event.corrections.create(previous=previous, reason=reason[:200], created_by=user)
+    return event
+
+
+def delete_event(*, user: User, farm_id: int, event_id: int) -> None:
+    """Quita un registro de la bitácora y devuelve su efecto al saldo de aves."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_write(membership)
+    with transaction.atomic():
+        event = (
+            LotEvent.objects.select_for_update()
+            .select_related("lot")
+            .filter(id=event_id, lot__farm_id=farm_id)
+            .first()
+        )
+        if event is None:
+            raise AppError("evento no encontrado", 404)
+        lot = Lot.objects.select_for_update().get(id=event.lot_id)
+        if lot.status != LotStatus.ABIERTO:
+            raise AppError("el lote está cerrado", 400)
+        if event.kind in BALANCE or event.kind == EventKind.AJUSTE:
+            _undo(lot, event)
+            lot.save(update_fields=["live_count"])
+        event.delete()
+
+
 def list_alerts(*, user: User, farm_id: int):
     """Avisos de la finca."""
     require_membership(user=user, farm_id=farm_id)
     return LotAlert.objects.filter(lot__farm_id=farm_id).select_related("lot", "house")
+
+
+def close_alert(*, user: User, farm_id: int, alert_id: int, follow_up: str = "") -> LotAlert:
+    """Cierra un aviso con el seguimiento hecho."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_close(membership)
+    alert = LotAlert.objects.filter(id=alert_id, lot__farm_id=farm_id).first()
+    if alert is None:
+        raise AppError("aviso no encontrado", 404)
+    if alert.state == AlertState.CERRADA:
+        return alert
+    alert.state = AlertState.CERRADA
+    alert.follow_up = (follow_up or "").strip()[:200]
+    alert.closed_at = timezone.now()
+    alert.save(update_fields=["state", "follow_up", "closed_at"])
+    return alert
+
+
 def event_payload(event: LotEvent) -> dict:
     """Evento listo para la API."""
     return {
@@ -138,6 +233,8 @@ def event_payload(event: LotEvent) -> dict:
             for item in event.corrections.all()
         ],
     }
+
+
 def alert_payload(alert: LotAlert) -> dict:
     """Aviso listo para la API."""
     return {
@@ -152,6 +249,8 @@ def alert_payload(alert: LotAlert) -> dict:
         "created_at": alert.created_at.isoformat(),
         "closed_at": alert.closed_at.isoformat() if alert.closed_at else None,
     }
+
+
 def _move_stock(lot: Lot, kind: str, value, payload: dict, notes: str) -> None:
     if kind in BALANCE:
         qty = _birds(value)
@@ -174,6 +273,8 @@ def _move_stock(lot: Lot, kind: str, value, payload: dict, notes: str) -> None:
         lot.live_count -= qty
         return
     raise AppError("el ajuste debe sumar o restar", 400)
+
+
 def _undo(lot: Lot, event: LotEvent) -> None:
     if event.kind in BALANCE:
         lot.live_count += int(event.observed_value or 0)
@@ -187,6 +288,8 @@ def _undo(lot: Lot, event: LotEvent) -> None:
         lot.live_count -= qty
         return
     lot.live_count += qty
+
+
 def isolation_balance(events) -> int:
     """Aves apartadas menos las que ya volvieron al espacio normal."""
     isolated = 0
@@ -200,6 +303,8 @@ def isolation_balance(events) -> int:
         else:
             isolated += amount
     return max(isolated, 0)
+
+
 def _check_isolation(lot: Lot, value, payload: dict, exclude_id: int | None = None) -> None:
     """No se puede devolver más de las aisladas ni apartar más de las que están en el lote."""
     direction = (payload or {}).get("direccion") or "apartar"
@@ -218,6 +323,8 @@ def _check_isolation(lot: Lot, value, payload: dict, exclude_id: int | None = No
     available = lot.live_count - current
     if direction == "apartar" and qty > available:
         raise AppError(f"solo hay {available} aves en el espacio normal", 400)
+
+
 def _check_payload(kind, value, notes, payload, confirmed: bool) -> None:
     if kind == EventKind.SANIDAD and confirmed and not payload.get("prescriptor"):
         raise AppError("un dato confirmado de sanidad necesita quién lo indicó", 400)
@@ -231,6 +338,8 @@ def _check_payload(kind, value, notes, payload, confirmed: bool) -> None:
         raise AppError("indica la cantidad de este registro", 400)
     if kind == EventKind.AJUSTE and not notes:
         raise AppError("el ajuste requiere una nota", 400)
+
+
 def _maybe_alert(lot: Lot, event: LotEvent) -> None:
     motives = []
     if event.attention == AttentionLevel.URGENTE:
@@ -248,6 +357,8 @@ def _maybe_alert(lot: Lot, event: LotEvent) -> None:
             motive=motive[:200],
             assignee=event.assignee,
         )
+
+
 def _lot(*, user: User, farm_id: int, lot_id: int, write: bool) -> Lot:
     membership = require_membership(user=user, farm_id=farm_id)
     if write:
@@ -256,6 +367,8 @@ def _lot(*, user: User, farm_id: int, lot_id: int, write: bool) -> Lot:
     if lot is None:
         raise AppError("lote no encontrado", 404)
     return lot
+
+
 def _snapshot(event: LotEvent) -> dict:
     return {
         "observed_value": decimal_text(event.observed_value),
@@ -264,6 +377,8 @@ def _snapshot(event: LotEvent) -> dict:
         "estimated": event.estimated,
         "confirmed": event.confirmed,
     }
+
+
 def _birds(value) -> int:
     if value is None:
         raise AppError("indica cuántas aves", 400)
@@ -271,17 +386,23 @@ def _birds(value) -> int:
     if amount != amount.to_integral_value() or amount <= 0:
         raise AppError("la cantidad de aves debe ser un entero mayor que cero", 400)
     return int(amount)
+
+
 def _required(value: str | None, label: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError(f"{label} es obligatorio", 400)
     return clean[:80]
+
+
 def _choice(value, allowed, default, label: str) -> str:
     if not value:
         return default
     if value not in allowed:
         raise AppError(f"{label} no válido", 400)
     return value
+
+
 def _aware(value):
     if timezone.is_naive(value):
         return timezone.make_aware(value)

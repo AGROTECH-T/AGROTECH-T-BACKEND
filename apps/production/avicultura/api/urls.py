@@ -1,4 +1,4 @@
-"""Rutas del modulo de galpon.
+"""Rutas del módulo de galpón.
 
 Prefijo: /api/v1/avicultura/
 @author Cristian Deysdayr Jimenez
@@ -6,14 +6,17 @@ Prefijo: /api/v1/avicultura/
 from django.urls import path
 
 from apps.production.avicultura.api.views import (
-    HouseListCreateView,
-    HouseDetailView,
-    LotListCreateView,
-    LotDetailView,
-    LotCloseView,
-    LotReopenView,
-    EventListCreateView,
+    AlertCloseView,
     AlertListView,
+    EventCorrectionView,
+    EventDetailView,
+    EventListCreateView,
+    HouseDetailView,
+    HouseListCreateView,
+    LotCloseView,
+    LotDetailView,
+    LotListCreateView,
+    LotReopenView,
 )
 
 urlpatterns = [
@@ -44,4 +47,20 @@ urlpatterns = [
         EventListCreateView.as_view(),
         name="avi-events",
     ),
-    path("avicultura/<int:farm_id>/alertas/", AlertListView.as_view(), name="avi-alerts"),]
+    path(
+        "avicultura/<int:farm_id>/eventos/<int:event_id>/corregir/",
+        EventCorrectionView.as_view(),
+        name="avi-event-correction",
+    ),
+    path(
+        "avicultura/<int:farm_id>/eventos/<int:event_id>/",
+        EventDetailView.as_view(),
+        name="avi-event",
+    ),
+    path("avicultura/<int:farm_id>/alertas/", AlertListView.as_view(), name="avi-alerts"),
+    path(
+        "avicultura/<int:farm_id>/alertas/<int:alert_id>/cerrar/",
+        AlertCloseView.as_view(),
+        name="avi-alert-close",
+    ),
+]
