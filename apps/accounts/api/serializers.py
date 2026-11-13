@@ -123,6 +123,48 @@ class AccountResponseSerializer(serializers.Serializer):
     phone = serializers.CharField()
     correo = serializers.EmailField()
     is_active = serializers.BooleanField()
+    is_superadmin = serializers.BooleanField()
+    is_administrador = serializers.BooleanField()
+    modulos = serializers.ListField(child=serializers.CharField())
+
+
+class AdministradorFichaSerializer(serializers.Serializer):
+    """Cuenta vista por el superadmin al nombrar administradores."""
+
+    id = serializers.IntegerField()
+    nombre = serializers.CharField()
+    identification = serializers.CharField()
+    correo = serializers.EmailField(allow_blank=True)
+    activo = serializers.BooleanField()
+    is_administrador = serializers.BooleanField()
+
+
+class ListaAdministradoresSerializer(serializers.Serializer):
+    """Pendientes de nombramiento y administradores ya creados."""
+
+    pendientes = AdministradorFichaSerializer(many=True)
+    administradores = AdministradorFichaSerializer(many=True)
+
+
+class CrearAdministradorSerializer(serializers.Serializer):
+    """Datos para que el superadmin cree un administrador."""
+
+    first_name = serializers.CharField(max_length=40)
+    last_name = serializers.CharField(max_length=40)
+    identification = serializers.CharField(max_length=30)
+    correo = serializers.EmailField()
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+
+    def validate(self, attrs: dict) -> dict:
+        """Normaliza la cuenta y exige una contraseña fuerte."""
+        attrs["first_name"] = normalize_name(attrs["first_name"], "primer nombre")
+        attrs["last_name"] = normalize_name(attrs["last_name"], "primer apellido")
+        attrs["identification"] = normalize_identification(attrs["identification"])
+        attrs["correo"] = attrs["correo"].strip().lower()
+        attrs["phone"] = normalize_phone(attrs.get("phone") or "") if attrs.get("phone") else ""
+        attrs["password"] = validate_password_strength(attrs["password"])
+        return attrs
 
 
 class SuccessResponseSerializer(serializers.Serializer):

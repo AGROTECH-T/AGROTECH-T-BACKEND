@@ -44,6 +44,7 @@ def make_user(db):
             phone=kwargs.pop("phone", "3001234567"),
             correo=kwargs.pop("correo", f"{identification}@example.com"),
             password_hash=make_password(VALID_PASSWORD),
+            is_administrador=kwargs.pop("is_administrador", True),
             **kwargs,
         )
 

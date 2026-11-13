@@ -27,6 +27,7 @@ from apps.accounts.api.throttles import (
     ResetIdentifierThrottle,
 )
 from apps.accounts.services import auth_service
+from apps.accounts.services.access import cuenta_publica
 
 
 class RegisterView(APIView):
@@ -119,7 +120,7 @@ class MeView(APIView):
     @extend_schema(responses={200: AccountResponseSerializer})
     def get(self, request: Request) -> Response:
         """Retorna los datos visibles del usuario actual."""
-        return Response(_account_payload(request.user))
+        return Response(cuenta_publica(request.user))
 
     @extend_schema(request=ProfileUpdateSerializer, responses={200: AccountResponseSerializer})
     def patch(self, request: Request) -> Response:
@@ -127,7 +128,7 @@ class MeView(APIView):
         serializer = ProfileUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         user = auth_service.update_profile(request.user, serializer.validated_data)
-        return Response(_account_payload(user))
+        return Response(cuenta_publica(user))
 
 
 class LogoutView(APIView):
@@ -138,19 +139,6 @@ class LogoutView(APIView):
         """Revoca inmediatamente el token vigente."""
         auth_service.logout(request.user)
         return Response({"ok": True})
-
-
-def _account_payload(user) -> dict:
-    """Arma los datos públicos de una cuenta autenticada."""
-    return {
-        "id": user.pk,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "identification": user.identification,
-        "phone": user.phone,
-        "correo": user.correo,
-        "is_active": user.is_active,
-    }
 
 
 def _token_response(token: str) -> Response:

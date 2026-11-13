@@ -21,15 +21,15 @@ PERMISOS_ADMIN = (
         "por_rol": {
             ADMINISTRADOR: {
                 "estado": PERMITIDO,
-                "detalle": "Cualquier cuenta registrada; quien la crea queda como administrador.",
+                "detalle": "Solo el administrador nombrado por el super administrador.",
             },
             OPERADOR: {
-                "estado": PERMITIDO,
-                "detalle": "No depende del rol; el creador queda como administrador.",
+                "estado": NO_PERMITIDO,
+                "detalle": "Solo el administrador nombrado por el super administrador.",
             },
             CONSULTA: {
-                "estado": PERMITIDO,
-                "detalle": "No depende del rol; el creador queda como administrador.",
+                "estado": NO_PERMITIDO,
+                "detalle": "Solo el administrador nombrado por el super administrador.",
             },
         },
     },

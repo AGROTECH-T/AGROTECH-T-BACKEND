@@ -59,6 +59,8 @@ def test_matriz_respeta_decisiones_clave(auth_client):
     assert matriz["ajustar_stock"][roles.OPERADOR]["estado"] == roles.NO_PERMITIDO
     assert matriz["gestionar_productos"][roles.OPERADOR]["estado"] == roles.NO_PERMITIDO
     assert matriz["eliminar_finca"][roles.OPERADOR]["estado"] == roles.NO_PERMITIDO
+    assert matriz["crear_finca"][roles.ADMINISTRADOR]["estado"] == roles.PERMITIDO
+    assert matriz["crear_finca"][roles.OPERADOR]["estado"] == roles.NO_PERMITIDO
 
 
 def test_identificadores_sin_duplicados():
