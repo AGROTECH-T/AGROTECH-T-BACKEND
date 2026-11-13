@@ -73,3 +73,41 @@ class CambiarRolView(APIView):
             role=payload.validated_data["role"],
         )
         return Response(persona)
+class PermisoDirectoView(APIView):
+    """Suma o retira un permiso directo de una membresía."""
+
+    @extend_schema(
+        request=PermisoDirectoSerializer,
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def post(self, request: Request, user_id: int) -> Response:
+        """Suma el permiso indicado al rol de esa finca."""
+        payload = PermisoDirectoSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.agregar_permiso(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=payload.validated_data["farm_id"],
+            permission=payload.validated_data["permission"],
+        )
+        return Response(persona)
+
+    @extend_schema(
+        parameters=[],
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def delete(self, request: Request, user_id: int) -> Response:
+        """Retira el permiso directo indicado en la consulta."""
+        farm_id = request.query_params.get("farm_id")
+        permission = (request.query_params.get("permission") or "").strip()
+        if not farm_id or not permission:
+            return Response({"error": "falta la finca o el permiso"}, status=400)
+        persona = asignacion.quitar_permiso(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=int(farm_id),
+            permission=permission,
+        )
+        return Response(persona)

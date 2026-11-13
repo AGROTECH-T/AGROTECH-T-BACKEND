@@ -116,6 +116,8 @@ def test_no_cambia_una_finca_ajena(make_user, login):
     )
 
     assert response.status_code == 404
+def _permisos(user_id: int) -> str:
+    return f"/api/v1/configuracion/usuarios/{user_id}/permisos/"
 def _alta() -> dict:
     return {
         "first_name": "Luz",
@@ -164,3 +166,45 @@ def test_ve_el_detalle_de_una_persona(make_user, login):
     assert response.status_code == 200
     assert response.json()["activo"] is True
     assert response.json()["membresias"][0]["role"] == FarmRole.CONSULTA
+@pytest.mark.django_db
+def test_suma_y_quita_permiso_directo(make_user, login):
+    """El permiso extra se agrega y después se puede retirar."""
+    from apps.farms.models import FarmPermission
+    from apps.farms.permissions import AJUSTAR_STOCK
+
+    admin = make_user("11000031", first_name="Ada", last_name="Admin")
+    persona = make_user("11000032", first_name="Olga", last_name="Campo")
+    finca = _finca("La vega")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+    operador = _miembro(finca, persona, FarmRole.OPERADOR)
+
+    added = login(admin).post(
+        _permisos(persona.id),
+        {"farm_id": finca.id, "permission": AJUSTAR_STOCK},
+        format="json",
+    )
+    assert added.status_code == 200
+    assert FarmPermission.objects.filter(membership=operador, permission=AJUSTAR_STOCK).exists()
+
+    removed = login(admin).delete(
+        f"{_permisos(persona.id)}?farm_id={finca.id}&permission={AJUSTAR_STOCK}"
+    )
+    assert removed.status_code == 200
+    assert not FarmPermission.objects.filter(membership=operador, permission=AJUSTAR_STOCK).exists()
+@pytest.mark.django_db
+def test_no_suma_un_permiso_que_el_rol_ya_trae(make_user, login):
+    """No se guarda un extra que el rol ya concede."""
+    from apps.farms.permissions import REGISTRAR_MOVIMIENTOS
+
+    admin = make_user("11000041", first_name="Ada", last_name="Admin")
+    persona = make_user("11000042", first_name="Olga", last_name="Campo")
+    finca = _finca("La vega")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+    _miembro(finca, persona, FarmRole.OPERADOR)
+
+    response = login(admin).post(
+        _permisos(persona.id),
+        {"farm_id": finca.id, "permission": REGISTRAR_MOVIMIENTOS},
+        format="json",
+    )
+    assert response.status_code == 400

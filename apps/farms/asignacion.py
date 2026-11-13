@@ -6,13 +6,17 @@ personas nuevas con su rol inicial.
 Contexto: el rol pertenece a la membresía; el permiso directo solo suma.
 @author Cristian Deysdayr Jimenez
 """
+
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
 from django.db.models import Q
+
 from apps.accounts.errors import AppError
 from apps.accounts.models import Session, User
 from apps.farms import permissions as farm_permissions
 from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole
+
+
 def listar_personas(actor: User, search: str = "") -> dict:
     """Devuelve las personas de las fincas donde el actor es administrador."""
     farm_ids = _fincas_administradas(actor)
@@ -25,6 +29,8 @@ def listar_personas(actor: User, search: str = "") -> dict:
         ),
         "usuarios": _agrupar(actor, farm_ids, search=search),
     }
+
+
 def detalle_persona(*, actor: User, user_id: int) -> dict:
     """Ficha completa: rol por finca, permisos del rol y permisos directos."""
     farm_ids = _fincas_administradas(actor)
@@ -32,6 +38,8 @@ def detalle_persona(*, actor: User, user_id: int) -> dict:
         raise AppError("solo el administrador puede ver los permisos", 403)
     person = _persona(actor, farm_ids, user_id)
     return _ficha_detalle(actor, person, farm_ids)
+
+
 def cambiar_rol(*, actor: User, user_id: int, farm_id: int, role: str) -> dict:
     """Cambia el rol de otra persona en una finca administrada."""
     if role not in FarmRole.values:
@@ -47,6 +55,55 @@ def cambiar_rol(*, actor: User, user_id: int, farm_id: int, role: str) -> dict:
     farm_ids = _fincas_administradas(actor)
     person = _persona(actor, farm_ids, user_id)
     return _ficha_detalle(actor, person, farm_ids)
+
+
+def agregar_permiso(*, actor: User, user_id: int, farm_id: int, permission: str) -> dict:
+    """Suma un permiso directo a la membresía indicada."""
+    if permission not in _IDS_ASIGNABLES:
+        raise AppError("ese permiso no se puede asignar", 400)
+    _exigir_finca_administrada(actor, farm_id)
+    if actor.id == user_id:
+        raise AppError("no puedes cambiar tus propios permisos", 403)
+    membership = _membresia(user_id, farm_id)
+    if farm_permissions.tiene_permiso(membership, permission):
+        raise AppError("el rol de esa persona ya permite esa acción", 400)
+    FarmPermission.objects.get_or_create(membership=membership, permission=permission)
+    return _ficha_detalle(actor, membership.user, _fincas_administradas(actor))
+
+
+def quitar_permiso(*, actor: User, user_id: int, farm_id: int, permission: str) -> dict:
+    """Retira un permiso directo; lo que da el rol se mantiene."""
+    _exigir_finca_administrada(actor, farm_id)
+    if actor.id == user_id:
+        raise AppError("no puedes cambiar tus propios permisos", 403)
+    membership = _membresia(user_id, farm_id)
+    borrados, _ = FarmPermission.objects.filter(
+        membership=membership,
+        permission=permission,
+    ).delete()
+    if not borrados:
+        raise AppError("ese permiso directo no existe", 404)
+    return _ficha_detalle(actor, membership.user, _fincas_administradas(actor))
+
+
+def cambiar_estado(*, actor: User, user_id: int, activo: bool) -> dict:
+    """Activa o inactiva la cuenta de otra persona."""
+    farm_ids = _fincas_administradas(actor)
+    if not farm_ids:
+        raise AppError("solo el administrador puede cambiar el estado", 403)
+    if actor.id == user_id:
+        raise AppError("no puedes cambiar tu propio estado", 403)
+    person = _persona(actor, farm_ids, user_id)
+    if person.is_active == activo:
+        raise AppError("la cuenta ya tiene ese estado", 400)
+    if not activo:
+        _conservar_administrador_activo(person, farm_ids)
+        Session.objects.filter(user=person).delete()
+    person.is_active = activo
+    person.save(update_fields=["is_active"])
+    return _ficha_detalle(actor, person, farm_ids)
+
+
 def crear_persona(*, actor: User, datos: dict) -> dict:
     """Crea la cuenta y la membresía en cada finca elegida."""
     farm_ids = datos.get("farm_ids") or [datos["farm_id"]]
@@ -76,6 +133,8 @@ def crear_persona(*, actor: User, datos: dict) -> dict:
                     raise AppError("el rol de esa persona ya permite esa acción", 400)
                 FarmPermission.objects.create(membership=membership, permission=permission)
     return _ficha_detalle(actor, person, _fincas_administradas(actor))
+
+
 def _fincas_administradas(actor: User) -> list[int]:
     """Identificadores de fincas donde el actor es administrador."""
     return list(
@@ -84,6 +143,8 @@ def _fincas_administradas(actor: User) -> list[int]:
             role=FarmRole.ADMINISTRADOR,
         ).values_list("farm_id", flat=True)
     )
+
+
 def _es_administrador(actor: User, farm_id: int) -> bool:
     """Indica si el actor administra esa finca."""
     return FarmMembership.objects.filter(
@@ -91,17 +152,23 @@ def _es_administrador(actor: User, farm_id: int) -> bool:
         farm_id=farm_id,
         role=FarmRole.ADMINISTRADOR,
     ).exists()
+
+
 def _exigir_finca_administrada(actor: User, farm_id: int) -> None:
     """Responde 403 si pertenece sin ser admin, o 404 si la finca no es suya."""
     if _es_administrador(actor, farm_id):
         return
     _rechazar_finca(actor, farm_id)
+
+
 def _rechazar_finca(actor: User, farm_id: int) -> None:
     """Distingue entre finca ajena y finca propia sin permiso."""
     pertenece = FarmMembership.objects.filter(user=actor, farm_id=farm_id).exists()
     if pertenece:
         raise AppError("solo el administrador puede cambiar roles", 403)
     raise AppError("finca no encontrada", 404)
+
+
 def _membresia(user_id: int, farm_id: int) -> FarmMembership:
     """Membresía de la persona en la finca o error 404."""
     membership = (
@@ -112,6 +179,8 @@ def _membresia(user_id: int, farm_id: int) -> FarmMembership:
     if membership is None:
         raise AppError("esa persona no pertenece a la finca", 404)
     return membership
+
+
 def _persona(actor: User, farm_ids: list[int], user_id: int) -> User:
     """Cuenta visible para el actor o error 404."""
     person = (
@@ -122,6 +191,8 @@ def _persona(actor: User, farm_ids: list[int], user_id: int) -> User:
     if person is None:
         raise AppError("esa persona no pertenece a tus fincas", 404)
     return person
+
+
 def _conservar_administrador(membership: FarmMembership, role: str) -> None:
     """Impide dejar la finca sin un administrador activo."""
     if membership.role != FarmRole.ADMINISTRADOR or role == FarmRole.ADMINISTRADOR:
@@ -137,11 +208,38 @@ def _conservar_administrador(membership: FarmMembership, role: str) -> None:
     )
     if not queda_otro:
         raise AppError("la finca debe conservar un administrador", 400)
+
+
+def _conservar_administrador_activo(person: User, farm_ids: list[int]) -> None:
+    """No permite inactivar al último administrador activo de una finca."""
+    for farm_id in farm_ids:
+        es_admin = FarmMembership.objects.filter(
+            user=person,
+            farm_id=farm_id,
+            role=FarmRole.ADMINISTRADOR,
+        ).exists()
+        if not es_admin:
+            continue
+        queda_otro = (
+            FarmMembership.objects.filter(
+                farm_id=farm_id,
+                role=FarmRole.ADMINISTRADOR,
+                user__is_active=True,
+            )
+            .exclude(user_id=person.id)
+            .exists()
+        )
+        if not queda_otro:
+            raise AppError("la finca debe conservar un administrador activo", 400)
+
+
 def _exigir_permisos(permisos: list[str]) -> None:
     """Valida que cada permiso directo exista en el catálogo asignable."""
     for permission in permisos:
         if permission not in _IDS_ASIGNABLES:
             raise AppError("ese permiso no se puede asignar", 400)
+
+
 def _agrupar(
     actor: User,
     farm_ids: list[int],
@@ -168,6 +266,8 @@ def _agrupar(
             }
         )
     return list(personas.values())
+
+
 def _ficha(actor: User, person: User) -> dict:
     """Datos públicos de la cuenta y sus membresías, todavía vacías."""
     return {
@@ -179,6 +279,8 @@ def _ficha(actor: User, person: User) -> dict:
         "es_yo": person.id == actor.id,
         "membresias": [],
     }
+
+
 def _ficha_detalle(actor: User, person: User, farm_ids: list[int]) -> dict:
     """Ficha con el rol y los permisos de cada finca administrada."""
     ficha = _ficha(actor, person)
@@ -199,6 +301,8 @@ def _ficha_detalle(actor: User, person: User, farm_ids: list[int]) -> dict:
             }
         )
     return ficha
+
+
 def _describir(permisos: set[str]) -> list[dict]:
     """Convierte códigos en filas con nombre y módulo, en orden estable."""
     filas = []
@@ -215,6 +319,8 @@ def _describir(permisos: set[str]) -> list[dict]:
             }
         )
     return filas
+
+
 _IDS_ASIGNABLES = {
     permiso["id"] for permiso in farm_permissions.PERMISOS_ASIGNABLES
 }
