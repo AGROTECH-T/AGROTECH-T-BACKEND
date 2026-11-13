@@ -5,16 +5,23 @@
 """
 import pytest
 from django.utils import timezone
+
 from apps.farms.services import create_farm
 from apps.production.avicultura.services import houses as house_services
 from apps.production.avicultura.services import lots as lot_services
+
+
 def _root(farm_id: int) -> str:
     return f"/api/v1/avicultura/{farm_id}"
+
+
 @pytest.mark.django_db
 def test_listar_galpones_exige_sesion(client, user):
     """Sin token no se ven los galpones."""
     farm_id = create_farm(user=user, name="La Esperanza").farm_id
     assert client.get(f"{_root(farm_id)}/galpones/").status_code == 401
+
+
 @pytest.mark.django_db
 def test_crear_y_listar_galpon(login, user):
     """El alta devuelve el galpón con área y sin lote abierto."""
@@ -33,6 +40,8 @@ def test_crear_y_listar_galpon(login, user):
     listed = client.get(f"{_root(farm_id)}/galpones/")
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == body["id"]
+
+
 @pytest.mark.django_db
 def test_editar_lote_sin_quien_recibio(login, user):
     """El parche del lote no exige repetir el nombre de quien recibió."""
@@ -56,6 +65,8 @@ def test_editar_lote_sin_quien_recibio(login, user):
     assert response.json()["supplier"] == "Incubadora El Campo"
     assert response.json()["receiver_name"] == "Ana Pérez"
     assert "summary" in response.json()
+
+
 @pytest.mark.django_db
 def test_ver_lote_exige_sesion_y_devuelve_ficha(client, login, user):
     """Sin token no hay ficha; con sesión se ve el lote creado."""
@@ -74,6 +85,8 @@ def test_ver_lote_exige_sesion_y_devuelve_ficha(client, login, user):
     body = login(user).get(f"{_root(farm_id)}/lotes/{lot.id}/")
     assert body.status_code == 200
     assert body.json()["code"] == "L-002"
+
+
 @pytest.mark.django_db
 def test_listar_lotes_y_eventos_por_http(login, user):
     """GET de lotes y de bitácora responde con el registro creado."""

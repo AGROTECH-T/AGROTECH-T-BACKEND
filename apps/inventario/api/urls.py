@@ -23,21 +23,21 @@ from apps.inventario.api.products.history_view import ProductHistoryFileView
 from apps.inventario.api.products.image_view import ProductImageView
 from apps.inventario.api.products.inventory_view import ProductInventoryFileView
 from apps.inventario.api.products.list_create_view import ProductListCreateView
+from apps.inventario.api.reports.files import (
+    AdjustmentReportFileView,
+    ConsumptionReportFileView,
+    LoanReportFileView,
+    OrderReportFileView,
+)
+from apps.inventario.api.reports.views import (
+    AdjustmentReportView,
+    ConsumptionReportView,
+    LoanReportView,
+    OrderReportView,
+)
 from apps.inventario.api.units.base_view import BaseUnitCreateView, BaseUnitDetailView
 from apps.inventario.api.units.create_view import CustomUnitCreateView
 from apps.inventario.api.units.detail_view import UnitDetailView
-from apps.inventario.api.reports.files import (
-    OrderReportFileView,
-    LoanReportFileView,
-    ConsumptionReportFileView,
-    AdjustmentReportFileView,
-)
-from apps.inventario.api.reports.views import (
-    OrderReportView,
-    LoanReportView,
-    ConsumptionReportView,
-    AdjustmentReportView,
-)
 
 app_name = "inventario"
 
