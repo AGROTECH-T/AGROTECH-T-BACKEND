@@ -1,126 +1,113 @@
-"""Segunda mitad de la matriz de permisos Farms.
+"""Mitad operativa de la matriz de permisos.
 
-Propósito: acciones operativas, financieras y de soporte.
-Contexto: catálogo funcional de Configuración.
+Propósito: describir lo que cada rol puede hacer en inventario, galpón y
+reportes, tal como lo valida el backend.
+Contexto: el catálogo es de lectura; el rol se guarda en la membresía.
 """
 
 from apps.farms.role_actors import (
     ADMINISTRADOR,
-    CONDICIONADO,
     CONSULTA,
     NO_PERMITIDO,
     OPERADOR,
-    PENDIENTE,
     PERMITIDO,
 )
 
 PERMISOS_OPS = (
     {
-        "id": "gestionar_actividades",
-        "nombre": "Gestionar actividades productivas",
+        "id": "ver_inventario",
+        "nombre": "Consultar el inventario",
+        "modulo": "Inventario",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PENDIENTE, "detalle": "Pendiente de delimitar."},
-            OPERADOR: {"estado": PENDIENTE, "detalle": "Pendiente de delimitar."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Productos, stock y movimientos."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Productos, stock y movimientos."},
+            CONSULTA: {"estado": PERMITIDO, "detalle": "Productos, stock y movimientos."},
         },
     },
     {
-        "id": "crear_registros",
-        "nombre": "Crear registros operativos",
+        "id": "registrar_movimientos",
+        "nombre": "Registrar entradas y salidas",
+        "modulo": "Inventario",
         "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Según los permisos del módulo."},
-            OPERADOR: {"estado": PERMITIDO, "detalle": "En módulos autorizados."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Entradas, salidas y préstamos."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Entradas, salidas y préstamos."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo lectura."},
         },
     },
     {
-        "id": "actualizar_registros",
-        "nombre": "Actualizar registros operativos",
+        "id": "crear_unidades",
+        "nombre": "Crear unidades de medida",
+        "modulo": "Inventario",
         "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Según los permisos del módulo."},
-            OPERADOR: {"estado": PERMITIDO, "detalle": "En módulos autorizados."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Unidades propias de la finca."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Unidades propias de la finca."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo lectura."},
         },
     },
     {
-        "id": "eliminar_registros",
-        "nombre": "Eliminar registros",
+        "id": "ajustar_stock",
+        "nombre": "Ajustar el stock",
+        "modulo": "Inventario",
+        "por_rol": {
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Con motivo registrado."},
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+        },
+    },
+    {
+        "id": "gestionar_productos",
+        "nombre": "Crear y editar productos",
+        "modulo": "Inventario",
+        "por_rol": {
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Productos y sus mínimos."},
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+        },
+    },
+    {
+        "id": "ver_reportes",
+        "nombre": "Consultar y exportar reportes",
+        "modulo": "Reportes",
+        "por_rol": {
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Reportes y archivos del inventario."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Reportes y archivos del inventario."},
+            CONSULTA: {"estado": PERMITIDO, "detalle": "Reportes y archivos del inventario."},
+        },
+    },
+    {
+        "id": "ver_galpon",
+        "nombre": "Consultar galpones y lotes",
+        "modulo": "Galpón",
         "por_rol": {
             ADMINISTRADOR: {
-                "estado": NO_PERMITIDO,
-                "detalle": "No concedido por defecto; requiere definición específica.",
+                "estado": PERMITIDO,
+                "detalle": "Galpones, lotes, bitácora e indicadores.",
             },
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido por defecto."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Galpones, lotes, bitácora e indicadores."},
+            CONSULTA: {"estado": PERMITIDO, "detalle": "Galpones, lotes, bitácora e indicadores."},
         },
     },
     {
-        "id": "consultar_historial",
-        "nombre": "Consultar historial operativo",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Según permisos y estado."},
-            OPERADOR: {"estado": CONDICIONADO, "detalle": "Según permisos y estado."},
-            CONSULTA: {"estado": CONDICIONADO, "detalle": "Según permisos y estado."},
-        },
-    },
-    {
-        "id": "consultar_auditoria",
-        "nombre": "Consultar auditoría administrativa",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Como administrador actual."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "exportar_informacion_general",
-        "nombre": "Exportar información general",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Permiso independiente."},
-            OPERADOR: {"estado": CONDICIONADO, "detalle": "Permiso independiente."},
-            CONSULTA: {"estado": CONDICIONADO, "detalle": "Permiso independiente."},
-        },
-    },
-    {
-        "id": "exportar_informacion_financiera",
-        "nombre": "Exportar información financiera",
+        "id": "registrar_galpon",
+        "nombre": "Registrar en el galpón",
+        "modulo": "Galpón",
         "por_rol": {
             ADMINISTRADOR: {
-                "estado": CONDICIONADO,
-                "detalle": "Solo administrador, según propuesta.",
+                "estado": PERMITIDO,
+                "detalle": "Galpones, recepción de lotes y bitácora.",
             },
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No, según propuesta."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No, según propuesta."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Galpones, recepción de lotes y bitácora."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo lectura."},
         },
     },
     {
-        "id": "consultar_suscripcion",
-        "nombre": "Consultar estado de suscripción",
+        "id": "cerrar_ciclo",
+        "nombre": "Cerrar el ciclo y sus avisos",
+        "modulo": "Galpón",
         "por_rol": {
-            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Estado y vigencia de la suscripción."},
-            OPERADOR: {"estado": PENDIENTE, "detalle": "Pendiente de definición."},
-            CONSULTA: {"estado": PENDIENTE, "detalle": "Pendiente de definición."},
-        },
-    },
-    {
-        "id": "cambiar_responsable_pago",
-        "nombre": "Cambiar responsable del pago",
-        "por_rol": {
-            ADMINISTRADOR: {
-                "estado": CONDICIONADO,
-                "detalle": "Sujeto a la definición del módulo de facturación.",
-            },
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-        },
-    },
-    {
-        "id": "autorizar_soporte",
-        "nombre": "Autorizar acceso temporal del soporte",
-        "por_rol": {
-            ADMINISTRADOR: {"estado": CONDICIONADO, "detalle": "Como administrador autorizado."},
-            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
-            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "No concedido."},
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Cierre del lote y avisos atendidos."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Cierre del lote y avisos atendidos."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo lectura."},
         },
     },
 )

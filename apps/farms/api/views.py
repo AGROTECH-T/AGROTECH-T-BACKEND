@@ -1,7 +1,8 @@
-"""Expone el catálogo de roles y permisos del submódulo de Configuración.
+"""Expone el catálogo de roles y la asignación de roles y permisos.
 
-Propósito: entregar la matriz funcional acordada para el módulo Farms.
-Contexto: requiere sesión válida; todavía no valida membresías ni fincas.
+Propósito: entregar la matriz funcional y administrar personas de la finca.
+Contexto: todo exige ser administrador de la finca y no permite tocarse a sí mismo.
+@author Cristian Deysdayr Jimenez
 """
 
 from drf_spectacular.utils import extend_schema
@@ -9,8 +10,16 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.farms import roles
-from apps.farms.api.serializers import RolesPermisosSerializer
+from apps.farms import asignacion, roles
+from apps.farms.api.serializers import (
+    AsignacionSerializer,
+    CambiarRolSerializer,
+    CrearUsuarioSerializer,
+    EstadoUsuarioSerializer,
+    PermisoDirectoSerializer,
+    RolesPermisosSerializer,
+    UsuarioAsignadoSerializer,
+)
 
 
 class RolesPermisosView(APIView):
@@ -24,3 +33,115 @@ class RolesPermisosView(APIView):
     def get(self, request: Request) -> Response:
         """Retorna el catálogo funcional de roles y permisos."""
         return Response(roles.catalogo())
+
+
+class AsignacionRolesView(APIView):
+    """Lista y crea las personas de las fincas que administra la sesión."""
+
+    @extend_schema(responses={200: AsignacionSerializer}, tags=["Configuración"])
+    def get(self, request: Request) -> Response:
+        """Devuelve personas y roles solo de las fincas administradas."""
+        search = (request.query_params.get("search") or "").strip()[:60]
+        return Response(asignacion.listar_personas(request.user, search=search))
+
+    @extend_schema(
+        request=CrearUsuarioSerializer,
+        responses={201: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def post(self, request: Request) -> Response:
+        """Crea una cuenta con su rol y sus permisos directos."""
+        payload = CrearUsuarioSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.crear_persona(actor=request.user, datos=payload.validated_data)
+        return Response(persona, status=201)
+
+
+class DetalleUsuarioView(APIView):
+    """Muestra el rol y los permisos de una persona."""
+
+    @extend_schema(responses={200: UsuarioAsignadoSerializer}, tags=["Configuración"])
+    def get(self, request: Request, user_id: int) -> Response:
+        """Devuelve la ficha con permisos del rol y permisos directos."""
+        return Response(asignacion.detalle_persona(actor=request.user, user_id=user_id))
+
+
+class CambiarRolView(APIView):
+    """Cambia el rol de otra persona en una finca administrada."""
+
+    @extend_schema(
+        request=CambiarRolSerializer,
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def put(self, request: Request, user_id: int) -> Response:
+        """Reemplaza el rol de la membresía indicada."""
+        payload = CambiarRolSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.cambiar_rol(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=payload.validated_data["farm_id"],
+            role=payload.validated_data["role"],
+        )
+        return Response(persona)
+
+
+class PermisoDirectoView(APIView):
+    """Suma o retira un permiso directo de una membresía."""
+
+    @extend_schema(
+        request=PermisoDirectoSerializer,
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def post(self, request: Request, user_id: int) -> Response:
+        """Suma el permiso indicado al rol de esa finca."""
+        payload = PermisoDirectoSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.agregar_permiso(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=payload.validated_data["farm_id"],
+            permission=payload.validated_data["permission"],
+        )
+        return Response(persona)
+
+    @extend_schema(
+        parameters=[],
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def delete(self, request: Request, user_id: int) -> Response:
+        """Retira el permiso directo indicado en la consulta."""
+        farm_id = request.query_params.get("farm_id")
+        permission = (request.query_params.get("permission") or "").strip()
+        if not farm_id or not permission:
+            return Response({"error": "falta la finca o el permiso"}, status=400)
+        persona = asignacion.quitar_permiso(
+            actor=request.user,
+            user_id=user_id,
+            farm_id=int(farm_id),
+            permission=permission,
+        )
+        return Response(persona)
+
+
+class EstadoUsuarioView(APIView):
+    """Activa o inactiva la cuenta de otra persona."""
+
+    @extend_schema(
+        request=EstadoUsuarioSerializer,
+        responses={200: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def put(self, request: Request, user_id: int) -> Response:
+        """Cambia el estado de la cuenta y cierra sus sesiones al inactivar."""
+        payload = EstadoUsuarioSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.cambiar_estado(
+            actor=request.user,
+            user_id=user_id,
+            activo=payload.validated_data["activo"],
+        )
+        return Response(persona)

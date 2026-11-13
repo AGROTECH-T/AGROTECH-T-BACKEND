@@ -182,6 +182,18 @@ class ProductLoan(models.Model):
         ordering = ["-created_at", "-id"]
 
 
+class AdjustmentReason(models.TextChoices):
+    """Por qué se corrigió el stock en un reconteo."""
+
+    CONTEO = "conteo_fisico", "Conteo físico"
+    HUMEDAD = "merma_humedad", "Merma por humedad"
+    PLAGA = "dano_plaga", "Daño o plaga"
+    VENCIMIENTO = "vencimiento", "Vencimiento"
+    PERDIDA = "robo_perdida", "Robo o pérdida"
+    CONSUMO = "consumo_no_registrado", "Consumo no registrado"
+    OTRO = "otro", "Otro"
+
+
 class Movement(models.Model):
     """Entrada, salida o ajuste sobre un insumo (inmutable)."""
 
@@ -201,6 +213,12 @@ class Movement(models.Model):
     stock_before = models.DecimalField(max_digits=12, decimal_places=3)
     stock_after = models.DecimalField(max_digits=12, decimal_places=3)
     note = models.CharField(max_length=200, blank=True, default="")
+    reason = models.CharField(
+        max_length=32,
+        choices=AdjustmentReason.choices,
+        blank=True,
+        default="",
+    )
     created_by = models.ForeignKey(
         User,
         on_delete=models.PROTECT,

@@ -6,6 +6,7 @@
 from django.urls import path
 
 from apps.accounts.api.confirm_view import ConfirmCodeView
+from apps.accounts.api.platform_views import AdministradoresView, PromoverAdministradorView
 from apps.accounts.api.views import (
     LoginView,
     LogoutView,
@@ -27,4 +28,14 @@ urlpatterns = [
     path("auth/password/confirm/", ConfirmCodeView.as_view(), name="password-confirm"),
     path("auth/password/reset/", ResetView.as_view(), name="password-reset"),
     path("auth/session/renew/", RenewView.as_view(), name="session-renew"),
+    path(
+        "configuracion/administradores/",
+        AdministradoresView.as_view(),
+        name="configuracion-administradores",
+    ),
+    path(
+        "configuracion/administradores/<int:user_id>/promover/",
+        PromoverAdministradorView.as_view(),
+        name="configuracion-promover-administrador",
+    ),
 ]

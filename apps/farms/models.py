@@ -1,6 +1,7 @@
 """Modelos del dominio de fincas.
 
-Propósito: representar fincas y la membresía de una cuenta con su rol.
+Propósito: representar fincas, la membresía de una cuenta con su rol y los
+permisos que se suman a ese rol.
 Contexto: una cuenta puede pertenecer a varias fincas con un rol distinto.
 """
 from django.db import models
@@ -47,5 +48,31 @@ class FarmMembership(models.Model):
             models.CheckConstraint(
                 condition=models.Q(role__in=FarmRole.values),
                 name="farms_membership_role_valid",
+            ),
+        ]
+
+
+class FarmPermission(models.Model):
+    """Permiso extra que se suma al rol de una membresía.
+
+    Propósito: delegar una acción concreta sin cambiar el rol.
+    Contexto: solo suma; nunca quita lo que el rol ya concede.
+    """
+
+    membership = models.ForeignKey(
+        FarmMembership,
+        on_delete=models.CASCADE,
+        related_name="extra_permissions",
+    )
+    permission = models.CharField(max_length=40)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "farm_permissions"
+        ordering = ["permission"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=("membership", "permission"),
+                name="uniq_farm_permission",
             ),
         ]

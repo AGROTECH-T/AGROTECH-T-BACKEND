@@ -15,6 +15,8 @@ class User(models.Model):
     correo = models.EmailField(max_length=254, blank=True)
     password_hash = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)
+    is_superadmin = models.BooleanField(default=False)
+    is_administrador = models.BooleanField(default=False)
     failed_login_attempts = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(blank=True, null=True)
 

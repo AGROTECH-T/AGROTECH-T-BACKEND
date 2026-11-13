@@ -23,6 +23,18 @@ from apps.inventario.api.products.history_view import ProductHistoryFileView
 from apps.inventario.api.products.image_view import ProductImageView
 from apps.inventario.api.products.inventory_view import ProductInventoryFileView
 from apps.inventario.api.products.list_create_view import ProductListCreateView
+from apps.inventario.api.reports.files import (
+    AdjustmentReportFileView,
+    ConsumptionReportFileView,
+    LoanReportFileView,
+    OrderReportFileView,
+)
+from apps.inventario.api.reports.views import (
+    AdjustmentReportView,
+    ConsumptionReportView,
+    LoanReportView,
+    OrderReportView,
+)
 from apps.inventario.api.units.base_view import BaseUnitCreateView, BaseUnitDetailView
 from apps.inventario.api.units.create_view import CustomUnitCreateView
 from apps.inventario.api.units.detail_view import UnitDetailView
@@ -115,5 +127,45 @@ urlpatterns = [
         "inventory/<int:farm_id>/movements/history.xlsx",
         FarmMovementHistoryFileView.as_view(),
         name="farm-movement-history-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/adjustments/",
+        AdjustmentReportView.as_view(),
+        name="report-adjustments",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/adjustments.xlsx",
+        AdjustmentReportFileView.as_view(),
+        name="report-adjustments-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/consumption/",
+        ConsumptionReportView.as_view(),
+        name="report-consumption",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/consumption.xlsx",
+        ConsumptionReportFileView.as_view(),
+        name="report-consumption-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/loans/",
+        LoanReportView.as_view(),
+        name="report-loans",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/loans.xlsx",
+        LoanReportFileView.as_view(),
+        name="report-loans-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/order/",
+        OrderReportView.as_view(),
+        name="report-order",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/order.xlsx",
+        OrderReportFileView.as_view(),
+        name="report-order-file",
     ),
 ]

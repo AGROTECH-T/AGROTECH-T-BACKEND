@@ -5,7 +5,7 @@ Propósito: validar entradas/salidas/ajustes y exponer el historial.
 """
 from rest_framework import serializers
 
-from apps.inventario.models import MovementKind
+from apps.inventario.models import AdjustmentReason, MovementKind
 
 
 class MovementCreateSerializer(serializers.Serializer):
@@ -20,6 +20,12 @@ class MovementCreateSerializer(serializers.Serializer):
     )
     note = serializers.CharField(
         max_length=200,
+        required=False,
+        allow_blank=True,
+        default="",
+    )
+    reason = serializers.ChoiceField(
+        choices=AdjustmentReason.choices,
         required=False,
         allow_blank=True,
         default="",
@@ -46,6 +52,8 @@ class MovementResponseSerializer(serializers.Serializer):
     unit_label = serializers.SerializerMethodField()
     base_symbol = serializers.SerializerMethodField()
     note = serializers.CharField()
+    reason = serializers.CharField()
+    reason_label = serializers.SerializerMethodField()
     product_id = serializers.IntegerField()
     product_name = serializers.SerializerMethodField()
     created_by_id = serializers.IntegerField()
@@ -66,3 +74,8 @@ class MovementResponseSerializer(serializers.Serializer):
 
     def get_created_by_name(self, obj) -> str:
         return f"{obj.created_by.first_name} {obj.created_by.last_name}".strip()
+
+    def get_reason_label(self, obj) -> str:
+        if not obj.reason:
+            return ""
+        return AdjustmentReason(obj.reason).label

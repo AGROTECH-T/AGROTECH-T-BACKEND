@@ -248,6 +248,102 @@ def test_ajuste_requiere_nota_y_admin(user, make_user):
 
 
 @pytest.mark.django_db
+def test_ajuste_guarda_motivo_y_rechaza_uno_invalido(user):
+    """El reconteo guarda el motivo; un código ajeno no pasa."""
+    from apps.inventario.models import AdjustmentReason
+
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    product = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Semilla",
+        unit_code="kg",
+        category_code="semilla",
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("10"),
+    )
+    movement = services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.AJUSTE,
+        quantity=Decimal("9"),
+        note="faltaba uno",
+        reason=AdjustmentReason.CONTEO,
+    )
+    assert movement.reason == AdjustmentReason.CONTEO
+
+    with pytest.raises(AppError) as error:
+        services.register_movement(
+            user=user,
+            farm_id=farm_id,
+            product_id=product.id,
+            kind=MovementKind.AJUSTE,
+            quantity=Decimal("9"),
+            note="dato raro",
+            reason="no_existe",
+        )
+    assert error.value.status_code == 400
+
+
+@pytest.mark.django_db
+def test_permiso_directo_permite_ajustar(user, make_user):
+    """Un operador con extra de ajuste puede recontear."""
+    from apps.farms.models import FarmPermission
+    from apps.farms.permissions import AJUSTAR_STOCK
+
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    product = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Semilla",
+        unit_code="kg",
+        category_code="semilla",
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("10"),
+    )
+    operator = make_user(identification="22334455")
+    membership = FarmMembership.objects.create(
+        farm_id=farm_id,
+        user=operator,
+        role=FarmRole.OPERADOR,
+    )
+    with pytest.raises(AppError) as denied:
+        services.register_movement(
+            user=operator,
+            farm_id=farm_id,
+            product_id=product.id,
+            kind=MovementKind.AJUSTE,
+            quantity=Decimal("8"),
+            note="conteo",
+            reason="conteo_fisico",
+        )
+    assert denied.value.status_code == 403
+
+    FarmPermission.objects.create(membership=membership, permission=AJUSTAR_STOCK)
+    movement = services.register_movement(
+        user=operator,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.AJUSTE,
+        quantity=Decimal("8"),
+        note="conteo",
+        reason="conteo_fisico",
+    )
+    assert movement.stock_after == Decimal("8")
+
+
+@pytest.mark.django_db
 def test_libra_y_galon_convierten_a_base(user):
     """Libra pasa a kg y galón a litros, con el factor de la finca."""
     del user
