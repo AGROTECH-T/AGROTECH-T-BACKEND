@@ -5,5 +5,9 @@ Prefijo: /api/v1/avicultura/
 """
 from django.urls import path
 
+from apps.production.avicultura.api.views import (
+    HouseListCreateView,
+)
+
 urlpatterns = [
-]
+    path("avicultura/<int:farm_id>/galpones/", HouseListCreateView.as_view(), name="avi-houses"),]
