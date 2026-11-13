@@ -18,6 +18,7 @@ class EventType(models.TextChoices):
     FARM_CREATED = "farm_created", "Finca creada"
     FARM_UPDATED = "farm_updated", "Finca actualizada"
     FARM_DEACTIVATED = "farm_deactivated", "Finca desactivada"
+    FARM_REACTIVATED = "farm_reactivated", "Finca reactivada"
     MEMBER_ROLE_CHANGED = "member_role_changed", "Rol de integrante cambiado"
     MEMBER_REVOKED = "member_revoked", "Integrante revocado"
     MEMBER_LEFT = "member_left", "Integrante abandonó la finca"
@@ -30,6 +31,18 @@ class EventType(models.TextChoices):
     PERMISSION_UNRESTRICTED = "permission_unrestricted", "Restricción retirada"
     SESSION_OPENED = "session_opened", "Sesión abierta"
     SESSION_CLOSED = "session_closed", "Sesión cerrada"
+    INVITATION_CREATED = "invitation_created", "Invitación creada"
+    INVITATION_RESEND_STARTED = "invitation_resend_started", "Reenvío de invitación iniciado"
+    INVITATION_RESENT = "invitation_resent", "Invitación reenviada"
+    INVITATION_DELIVERY_FAILED = "invitation_delivery_failed", "Entrega de invitación fallida"
+    INVITATION_ROLE_CHANGED = "invitation_role_changed", "Rol de invitación cambiado"
+    INVITATION_CANCELLED = "invitation_cancelled", "Invitación cancelada"
+    INVITATION_EXPIRED = "invitation_expired", "Invitación expirada"
+    INVITATION_ACCEPTED = "invitation_accepted", "Invitación aceptada"
+    MEMBER_JOINED = "member_joined", "Integrante incorporado"
+    MEMBER_REACTIVATED = "member_reactivated", "Integrante reactivado"
+    FARM_CREATION_GRANTED = "farm_creation_granted", "Capacidad de crear fincas concedida"
+    FARM_CREATION_REVOKED = "farm_creation_revoked", "Capacidad de crear fincas retirada"
 
 
 class AuditEvent(models.Model):

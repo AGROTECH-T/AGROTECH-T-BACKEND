@@ -13,6 +13,7 @@ def test_event_catalog_is_exact():
         "farm_created",
         "farm_updated",
         "farm_deactivated",
+        "farm_reactivated",
         "member_role_changed",
         "member_revoked",
         "member_left",
@@ -25,6 +26,18 @@ def test_event_catalog_is_exact():
         "permission_unrestricted",
         "session_opened",
         "session_closed",
+        "invitation_created",
+        "invitation_resend_started",
+        "invitation_resent",
+        "invitation_delivery_failed",
+        "invitation_role_changed",
+        "invitation_cancelled",
+        "invitation_expired",
+        "invitation_accepted",
+        "member_joined",
+        "member_reactivated",
+        "farm_creation_granted",
+        "farm_creation_revoked",
     ]
 
 

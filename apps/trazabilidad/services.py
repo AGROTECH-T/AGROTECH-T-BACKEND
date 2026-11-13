@@ -18,6 +18,11 @@ SENSITIVE_KEYS = frozenset(
         "token",
         "secret",
         "otp",
+        # F10.3.2: solo los nombres propios de los códigos de invitación
+        # ("codehash" e "invitationcode" una vez normalizados); no se bloquea
+        # "code" en general.
+        "code_hash",
+        "invitation_code",
         "cookie",
         "session",
         "credential",
@@ -55,6 +60,22 @@ def _normalize_key(name) -> str:
 
 NORMALIZED_SENSITIVE_KEYS = frozenset(_normalize_key(key) for key in SENSITIVE_KEYS)
 
+# Límite real del motivo: el de la columna AuditEvent.reason (fuente única).
+AUDIT_REASON_MAX_LENGTH = AuditEvent._meta.get_field("reason").max_length
+REASON_TOO_LONG = f"el motivo no puede superar {AUDIT_REASON_MAX_LENGTH} caracteres"
+
+
+def normalize_reason(reason) -> str:
+    """Recorta espacios del motivo y rechaza los que superan el límite.
+
+    No trunca: un motivo demasiado largo es un error de validación. Las
+    entradas HTTP lo validan antes en su serializer con el mismo límite.
+    """
+    clean = (reason or "").strip()
+    if len(clean) > AUDIT_REASON_MAX_LENGTH:
+        raise ValidationError(REASON_TOO_LONG)
+    return clean
+
 
 def record_audit_event(
     *,
@@ -71,7 +92,9 @@ def record_audit_event(
     """Crea un evento de auditoría dentro de la transacción del llamador.
 
     Valida el tipo de evento, la entidad y la serialización de los payloads, y
-    rechaza datos sensibles. No abre transacción propia.
+    rechaza datos sensibles y motivos que superan AUDIT_REASON_MAX_LENGTH (sin
+    truncarlos). No abre transacción propia: si la validación falla, la
+    operación del llamador revierte.
     """
     if event_type not in EventType.values:
         raise ValidationError(f"tipo de evento no válido: {event_type!r}")
@@ -81,6 +104,7 @@ def record_audit_event(
     before = _clean_payload(before, "before_data")
     after = _clean_payload(after, "after_data")
     metadata = _clean_payload(metadata, "metadata")
+    clean_reason = normalize_reason(reason)
 
     return AuditEvent.objects.create(
         event_type=event_type,
@@ -93,7 +117,7 @@ def record_audit_event(
         entity_id=str(entity_id),
         before_data=before,
         after_data=after,
-        reason=(reason or "").strip()[:200],
+        reason=clean_reason,
         metadata=metadata or {},
     )
 
