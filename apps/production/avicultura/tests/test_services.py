@@ -99,6 +99,14 @@ def test_codigo_de_lote_unico(user, farm_id):
         _lote(user, farm_id, other.id, code="L-001")
     assert error.value.status_code == 409
 @pytest.mark.django_db
+def test_borrar_lote_abierto_libera_el_galpon(user, farm_id):
+    """Si no queda otro lote abierto, el galpón vuelve a disponible."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    lot_services.delete_lot(user=user, farm_id=farm_id, lot_id=lot.id)
+    house.refresh_from_db()
+    assert house.status == HouseStatus.DISPONIBLE
+@pytest.mark.django_db
 def test_actualiza_y_borra_un_galpon(user, farm_id):
     """Se puede cambiar el nombre y luego quitar el galpón."""
     house = _galpon(user, farm_id, name="Norte")

@@ -56,6 +56,24 @@ class LotWriteSerializer(serializers.Serializer):
     feed_type = serializers.CharField(required=False, allow_blank=True)
     reception_notes = serializers.CharField(required=False, allow_blank=True)
     receiver_name = serializers.CharField()
+class LotPatchSerializer(serializers.Serializer):
+    code = serializers.CharField(required=False)
+    arrived_at = serializers.DateTimeField(required=False)
+    supplier = serializers.CharField(required=False, allow_blank=True)
+    documents = serializers.CharField(required=False, allow_blank=True)
+    initial_age_days = serializers.IntegerField(required=False)
+    initial_weight = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=3,
+        required=False,
+        allow_null=True,
+    )
+    stage = serializers.CharField(required=False, allow_blank=True)
+    levante_on = serializers.DateField(required=False, allow_null=True)
+    engorde_on = serializers.DateField(required=False, allow_null=True)
+    feed_type = serializers.CharField(required=False, allow_blank=True)
+    reception_notes = serializers.CharField(required=False, allow_blank=True)
+    receiver_name = serializers.CharField(required=False, allow_blank=True)
 class HouseListCreateView(APIView):
     """Galpones de la finca."""
     @extend_schema(tags=["avicultura"])
@@ -127,3 +145,23 @@ class LotDetailView(APIView):
     def get(self, request: Request, farm_id: int, lot_id: int) -> Response:
         lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
         return Response(lot_services.lot_payload(lot, with_summary=True))
+    @extend_schema(request=LotPatchSerializer, tags=["avicultura"])
+    def patch(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        serializer = LotPatchSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        lot_services.update_lot(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+            **serializer.validated_data,
+        )
+        lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
+        return Response(lot_services.lot_payload(lot, with_summary=True))
+    @extend_schema(tags=["avicultura"])
+    def delete(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        lot_services.delete_lot(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)

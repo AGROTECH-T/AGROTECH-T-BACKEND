@@ -34,6 +34,29 @@ def test_crear_y_listar_galpon(login, user):
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == body["id"]
 @pytest.mark.django_db
+def test_editar_lote_sin_quien_recibio(login, user):
+    """El parche del lote no exige repetir el nombre de quien recibió."""
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    house = house_services.create_house(user=user, farm_id=farm_id, name="Norte")
+    lot = lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        code="L-001",
+        arrived_at=timezone.now(),
+        received=80,
+        receiver_name="Ana Pérez",
+    )
+    response = login(user).patch(
+        f"{_root(farm_id)}/lotes/{lot.id}/",
+        {"supplier": "Incubadora El Campo"},
+        format="json",
+    )
+    assert response.status_code == 200
+    assert response.json()["supplier"] == "Incubadora El Campo"
+    assert response.json()["receiver_name"] == "Ana Pérez"
+    assert "summary" in response.json()
+@pytest.mark.django_db
 def test_ver_lote_exige_sesion_y_devuelve_ficha(client, login, user):
     """Sin token no hay ficha; con sesión se ve el lote creado."""
     farm_id = create_farm(user=user, name="La Esperanza").farm_id

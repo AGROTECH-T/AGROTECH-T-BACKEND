@@ -89,6 +89,67 @@ def open_lot(*, user: User, farm_id: int, **data) -> Lot:
     except IntegrityError as exc:
         raise AppError("ya existe un lote con ese código", 409) from exc
     return lot
+def update_lot(*, user: User, farm_id: int, lot_id: int, **data) -> Lot:
+    """Corrige los datos de recepción del lote sin tocar el saldo de aves."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_write(membership)
+    lot = Lot.objects.select_related("house").filter(id=lot_id, farm_id=farm_id).first()
+    if lot is None:
+        raise AppError("lote no encontrado", 404)
+
+    if data.get("code") is not None:
+        lot.code = _code(data["code"])
+    if data.get("arrived_at") is not None:
+        arrived = data["arrived_at"]
+        lot.arrived_at = timezone.make_aware(arrived) if timezone.is_naive(arrived) else arrived
+    if data.get("supplier") is not None:
+        lot.supplier = data["supplier"].strip()[:120]
+    if data.get("documents") is not None:
+        lot.documents = data["documents"].strip()[:200]
+    if data.get("initial_age_days") is not None:
+        lot.initial_age_days = max(int(data["initial_age_days"]), 0)
+    if "initial_weight" in data:
+        lot.initial_weight = _positive(data["initial_weight"], "el peso inicial")
+    if data.get("stage"):
+        if data["stage"] not in LotStage.values:
+            raise AppError("etapa no válida", 400)
+        lot.stage = data["stage"]
+    if "levante_on" in data:
+        lot.levante_on = data["levante_on"]
+    if "engorde_on" in data:
+        lot.engorde_on = data["engorde_on"]
+    if data.get("feed_type") is not None:
+        lot.feed_type = data["feed_type"].strip()[:80]
+    if data.get("reception_notes") is not None:
+        lot.reception_notes = data["reception_notes"].strip()
+    if data.get("receiver_name") is not None:
+        lot.receiver_name = _required(data["receiver_name"], "quién recibió el lote")
+
+    try:
+        lot.save()
+    except IntegrityError as exc:
+        raise AppError("ya existe un lote con ese código", 409) from exc
+    return lot
+def delete_lot(*, user: User, farm_id: int, lot_id: int) -> None:
+    """Elimina el lote con su bitácora. El galpón vuelve a quedar disponible."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_write(membership)
+    with transaction.atomic():
+        lot = (
+            Lot.objects.select_for_update()
+            .select_related("house")
+            .filter(id=lot_id, farm_id=farm_id)
+            .first()
+        )
+        if lot is None:
+            raise AppError("lote no encontrado", 404)
+        house = lot.house
+        was_open = lot.status == LotStatus.ABIERTO
+        lot.delete()
+        if was_open and house.status == HouseStatus.OCUPADO:
+            if not house.lots.filter(status=LotStatus.ABIERTO).exists():
+                house.status = HouseStatus.DISPONIBLE
+                house.save(update_fields=["status", "updated_at"])
 def get_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
     """Un lote de la finca."""
     require_membership(user=user, farm_id=farm_id)
