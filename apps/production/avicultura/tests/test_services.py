@@ -125,3 +125,14 @@ def test_no_renombra_a_un_galpon_existente(user, farm_id):
             name="Norte",
         )
     assert error.value.status_code == 409
+@pytest.mark.django_db
+def test_lista_lotes_y_su_detalle(user, farm_id):
+    """El listado trae el lote abierto y el detalle incluye el resumen."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id, code="L-020")
+    listed = lot_services.list_lots(user=user, farm_id=farm_id, house_id=house.id)
+    assert listed.count() == 1
+    detail = lot_services.get_lot(user=user, farm_id=farm_id, lot_id=lot.id)
+    payload = lot_services.lot_payload(detail, with_summary=True)
+    assert payload["code"] == "L-020"
+    assert "summary" in payload

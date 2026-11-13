@@ -33,3 +33,21 @@ def test_crear_y_listar_galpon(login, user):
     listed = client.get(f"{_root(farm_id)}/galpones/")
     assert listed.status_code == 200
     assert listed.json()[0]["id"] == body["id"]
+@pytest.mark.django_db
+def test_ver_lote_exige_sesion_y_devuelve_ficha(client, login, user):
+    """Sin token no hay ficha; con sesión se ve el lote creado."""
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    house = house_services.create_house(user=user, farm_id=farm_id, name="Norte")
+    lot = lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        code="L-002",
+        arrived_at=timezone.now(),
+        received=50,
+        receiver_name="Ana Pérez",
+    )
+    assert client.get(f"{_root(farm_id)}/lotes/{lot.id}/").status_code == 401
+    body = login(user).get(f"{_root(farm_id)}/lotes/{lot.id}/")
+    assert body.status_code == 200
+    assert body.json()["code"] == "L-002"

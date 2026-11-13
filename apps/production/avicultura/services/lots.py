@@ -26,6 +26,13 @@ from apps.production.avicultura.services.events import isolation_balance
 from apps.production.avicultura.services.houses import decimal_text
 OPEN_HOUSE = {HouseStatus.DISPONIBLE, HouseStatus.OCUPADO}
 BALANCE_KINDS = {EventKind.MORTALIDAD, EventKind.DESCARTE, EventKind.SALIDA}
+def list_lots(*, user: User, farm_id: int, house_id: int | None = None):
+    """Lotes de la finca, el más reciente primero."""
+    require_membership(user=user, farm_id=farm_id)
+    queryset = Lot.objects.filter(farm_id=farm_id).select_related("house")
+    if house_id is not None:
+        queryset = queryset.filter(house_id=house_id)
+    return queryset
 def open_lot(*, user: User, farm_id: int, **data) -> Lot:
     """Recibe un lote y ocupa el galpón."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -81,6 +88,13 @@ def open_lot(*, user: User, farm_id: int, **data) -> Lot:
             house.save(update_fields=["status", "updated_at"])
     except IntegrityError as exc:
         raise AppError("ya existe un lote con ese código", 409) from exc
+    return lot
+def get_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
+    """Un lote de la finca."""
+    require_membership(user=user, farm_id=farm_id)
+    lot = Lot.objects.select_related("house").filter(id=lot_id, farm_id=farm_id).first()
+    if lot is None:
+        raise AppError("lote no encontrado", 404)
     return lot
 def summarize(lot: Lot) -> dict:
     """Indicadores del lote. Lo estimado no se presenta como exacto."""

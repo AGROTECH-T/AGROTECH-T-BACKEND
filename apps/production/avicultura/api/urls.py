@@ -9,6 +9,7 @@ from apps.production.avicultura.api.views import (
     HouseListCreateView,
     HouseDetailView,
     LotListCreateView,
+    LotDetailView,
 )
 
 urlpatterns = [
@@ -18,4 +19,9 @@ urlpatterns = [
         HouseDetailView.as_view(),
         name="avi-house",
     ),
-    path("avicultura/<int:farm_id>/lotes/", LotListCreateView.as_view(), name="avi-lots"),]
+    path("avicultura/<int:farm_id>/lotes/", LotListCreateView.as_view(), name="avi-lots"),
+    path(
+        "avicultura/<int:farm_id>/lotes/<int:lot_id>/",
+        LotDetailView.as_view(),
+        name="avi-lot",
+    ),]

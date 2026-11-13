@@ -101,6 +101,15 @@ class HouseDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 class LotListCreateView(APIView):
     """Lotes de la finca."""
+    @extend_schema(tags=["avicultura"])
+    def get(self, request: Request, farm_id: int) -> Response:
+        house_id = request.query_params.get("house")
+        lots = lot_services.list_lots(
+            user=request.user,
+            farm_id=farm_id,
+            house_id=int(house_id) if house_id else None,
+        )
+        return Response([lot_services.lot_payload(lot) for lot in lots])
     @extend_schema(request=LotWriteSerializer, tags=["avicultura"])
     def post(self, request: Request, farm_id: int) -> Response:
         serializer = LotWriteSerializer(data=request.data)
@@ -112,3 +121,9 @@ class LotListCreateView(APIView):
         )
         lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot.id)
         return Response(lot_services.lot_payload(lot), status=status.HTTP_201_CREATED)
+class LotDetailView(APIView):
+    """Consulta, corrige o elimina un lote."""
+    @extend_schema(tags=["avicultura"])
+    def get(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
+        return Response(lot_services.lot_payload(lot, with_summary=True))
