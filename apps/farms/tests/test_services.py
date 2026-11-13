@@ -20,6 +20,17 @@ def test_create_farm_accepts_valid_name(user):
     assert FarmMembership.objects.count() == 1
 
 
+def test_create_farm_rejects_cuenta_sin_nombrar(make_user):
+    """Una cuenta registrada no crea fincas hasta que el superadmin la nombre."""
+    pendiente = make_user(identification="88888888", is_administrador=False)
+
+    with pytest.raises(AppError) as error:
+        services.create_farm(user=pendiente, name="La Esperanza")
+
+    assert error.value.status_code == 403
+    assert not Farm.objects.exists()
+
+
 def test_create_farm_accepts_name_at_max_length(user):
     """Un nombre de longitud máxima es válido."""
     max_length = Farm._meta.get_field("name").max_length

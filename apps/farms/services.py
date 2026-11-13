@@ -12,6 +12,8 @@ from apps.farms.models import Farm, FarmMembership, FarmRole
 
 def create_farm(*, user: User, name: str) -> FarmMembership:
     """Crea una finca y la membresía administradora en una sola transacción."""
+    if not user.is_administrador:
+        raise AppError("solo un administrador puede crear fincas", 403)
     validated_name = _validate_farm_name(name)
     with transaction.atomic():
         farm = Farm.objects.create(name=validated_name)
