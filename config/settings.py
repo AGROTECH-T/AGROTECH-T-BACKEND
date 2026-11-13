@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from config import platform
 from config.database import database
+from config.invitation_code_key import resolve_invitation_code_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -39,6 +40,7 @@ INSTALLED_APPS = [
     "drf_spectacular",
     "apps.accounts",
     "apps.farms",
+    "apps.permissions",
     "apps.production.avicultura",
     "apps.production.piscicultura",
     "apps.production.porcicultura",
@@ -88,9 +90,12 @@ USE_I18N = True
 USE_TZ = True
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+# A1: limpieza obligatoria de permisos al salir, revocar o reactivar membresías.
+FARMS_PERMISSION_CLEANUP = "required"
 
 CACHES = platform.CACHES
 CORS_ALLOWED_ORIGINS = platform.CORS_ALLOWED_ORIGINS
+CSRF_COOKIE_HTTPONLY = platform.CSRF_COOKIE_HTTPONLY
 CSRF_COOKIE_SECURE = platform.CSRF_COOKIE_SECURE
 DEFAULT_FROM_EMAIL = platform.DEFAULT_FROM_EMAIL
 EMAIL_BACKEND = platform.EMAIL_BACKEND
@@ -99,6 +104,12 @@ EMAIL_HOST_PASSWORD = platform.EMAIL_HOST_PASSWORD
 EMAIL_HOST_USER = platform.EMAIL_HOST_USER
 EMAIL_PORT = platform.EMAIL_PORT
 EMAIL_USE_TLS = platform.EMAIL_USE_TLS
+FRONTEND_URL = platform.FRONTEND_URL
+# F10.3.2: obligatoria y validada al arrancar en producción (DEBUG=False);
+# en desarrollo y pruebas el servicio falla de forma cerrada al usarla si falta.
+INVITATION_CODE_HMAC_KEY = resolve_invitation_code_key(
+    platform.INVITATION_CODE_HMAC_KEY, debug=DEBUG, secret_key=SECRET_KEY
+)
 LOGGING = platform.LOGGING
 PASSWORD_HASHERS = platform.PASSWORD_HASHERS
 REST_FRAMEWORK = platform.REST_FRAMEWORK
@@ -108,5 +119,9 @@ SECURE_HSTS_PRELOAD = platform.SECURE_HSTS_PRELOAD
 SECURE_HSTS_SECONDS = platform.SECURE_HSTS_SECONDS
 SECURE_PROXY_SSL_HEADER = platform.SECURE_PROXY_SSL_HEADER
 SECURE_SSL_REDIRECT = platform.SECURE_SSL_REDIRECT
+SESSION_COOKIE_AGE = platform.SESSION_COOKIE_AGE
+SESSION_COOKIE_HTTPONLY = platform.SESSION_COOKIE_HTTPONLY
+SESSION_COOKIE_SAMESITE = platform.SESSION_COOKIE_SAMESITE
 SESSION_COOKIE_SECURE = platform.SESSION_COOKIE_SECURE
+SESSION_ENGINE = platform.SESSION_ENGINE
 SPECTACULAR_SETTINGS = platform.SPECTACULAR_SETTINGS
