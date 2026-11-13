@@ -17,4 +17,5 @@ urlpatterns = [
     path("v1/", include("apps.farms.urls")),
     path("v1/", include("apps.farms.api.urls")),
     path("v1/", include("apps.inventario.api.urls")),
+    path("v1/", include("apps.production.avicultura.api.urls")),
 ]
