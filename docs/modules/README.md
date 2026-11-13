@@ -18,6 +18,12 @@ huella HMAC y campo `code_hash`), su integración en los servicios (F10.3.2) y
 su entrega por correo (F10.3.3-A; aún sin endpoints para usarlo) están en
 `docs/modules/farms-invitation-codes.md`.
 
+La arquitectura y los contratos técnicos de IoT (IoT-01, solo diseño, sin
+código) están en `docs/modules/iot-arquitectura.md`, `iot-flujo-medicion.md`,
+`iot-contrato-lora.md`, `iot-contrato-mqtt.md`, `iot-seguridad.md` e
+`iot-persistencia-entrega.md`; sus decisiones y pendientes, en
+`docs/decisions/DEC-13-arquitectura-iot.md`.
+
 Las decisiones arquitectónicas aprobadas se indexan en
 `docs/decisions/README.md`.
 
