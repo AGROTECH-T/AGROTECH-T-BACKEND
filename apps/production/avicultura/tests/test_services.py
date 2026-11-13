@@ -99,6 +99,22 @@ def test_codigo_de_lote_unico(user, farm_id):
         _lote(user, farm_id, other.id, code="L-001")
     assert error.value.status_code == 409
 @pytest.mark.django_db
+def test_cierre_deja_disponible_y_reabrir_ocupa(user, farm_id):
+    """Al cerrar, el galpón queda disponible; al reabrir, vuelve a ocupado."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    lot_services.close_lot(user=user, farm_id=farm_id, lot_id=lot.id, note="Salida total")
+    house.refresh_from_db()
+    lot.refresh_from_db()
+    assert lot.status == LotStatus.CERRADO
+    assert house.status == HouseStatus.DISPONIBLE
+    assert lot.close_summary["nota_cierre"] == "Salida total"
+    lot_services.reopen_lot(user=user, farm_id=farm_id, lot_id=lot.id)
+    house.refresh_from_db()
+    lot.refresh_from_db()
+    assert lot.status == LotStatus.ABIERTO
+    assert house.status == HouseStatus.OCUPADO
+@pytest.mark.django_db
 def test_borrar_lote_abierto_libera_el_galpon(user, farm_id):
     """Si no queda otro lote abierto, el galpón vuelve a disponible."""
     house = _galpon(user, farm_id)
@@ -106,6 +122,20 @@ def test_borrar_lote_abierto_libera_el_galpon(user, farm_id):
     lot_services.delete_lot(user=user, farm_id=farm_id, lot_id=lot.id)
     house.refresh_from_db()
     assert house.status == HouseStatus.DISPONIBLE
+@pytest.mark.django_db
+def test_consulta_no_cierra_el_ciclo(user, make_user, farm_id):
+    """Cerrar lote o aviso exige el permiso de cierre, no solo ver."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    reader = make_user(identification="87654323")
+    FarmMembership.objects.create(
+        farm_id=farm_id,
+        user=reader,
+        role=FarmRole.CONSULTA,
+    )
+    with pytest.raises(AppError) as error:
+        lot_services.close_lot(user=reader, farm_id=farm_id, lot_id=lot.id)
+    assert error.value.status_code == 403
 @pytest.mark.django_db
 def test_actualiza_y_borra_un_galpon(user, farm_id):
     """Se puede cambiar el nombre y luego quitar el galpón."""

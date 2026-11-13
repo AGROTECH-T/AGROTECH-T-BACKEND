@@ -74,6 +74,8 @@ class LotPatchSerializer(serializers.Serializer):
     feed_type = serializers.CharField(required=False, allow_blank=True)
     reception_notes = serializers.CharField(required=False, allow_blank=True)
     receiver_name = serializers.CharField(required=False, allow_blank=True)
+class CloseSerializer(serializers.Serializer):
+    note = serializers.CharField(required=False, allow_blank=True)
 class HouseListCreateView(APIView):
     """Galpones de la finca."""
     @extend_schema(tags=["avicultura"])
@@ -165,3 +167,30 @@ class LotDetailView(APIView):
             lot_id=lot_id,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
+class LotCloseView(APIView):
+    """Cierra el lote."""
+
+    @extend_schema(tags=["avicultura"])
+    def post(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        serializer = CloseSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        lot_services.close_lot(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+            note=serializer.validated_data.get("note", ""),
+        )
+        lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
+        return Response(lot_services.lot_payload(lot, with_summary=True))
+class LotReopenView(APIView):
+    """Reabre un lote cerrado por error."""
+
+    @extend_schema(tags=["avicultura"])
+    def post(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        lot_services.reopen_lot(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+        )
+        lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
+        return Response(lot_services.lot_payload(lot, with_summary=True))

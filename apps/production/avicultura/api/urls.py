@@ -10,6 +10,8 @@ from apps.production.avicultura.api.views import (
     HouseDetailView,
     LotListCreateView,
     LotDetailView,
+    LotCloseView,
+    LotReopenView,
 )
 
 urlpatterns = [
@@ -24,4 +26,14 @@ urlpatterns = [
         "avicultura/<int:farm_id>/lotes/<int:lot_id>/",
         LotDetailView.as_view(),
         name="avi-lot",
+    ),
+    path(
+        "avicultura/<int:farm_id>/lotes/<int:lot_id>/cerrar/",
+        LotCloseView.as_view(),
+        name="avi-lot-close",
+    ),
+    path(
+        "avicultura/<int:farm_id>/lotes/<int:lot_id>/reabrir/",
+        LotReopenView.as_view(),
+        name="avi-lot-reopen",
     ),]

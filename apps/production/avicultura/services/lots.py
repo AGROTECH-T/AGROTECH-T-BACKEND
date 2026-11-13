@@ -1,12 +1,14 @@
-"""Lote de engorde.
+﻿"""Lote de engorde.
 
 Propósito: abrir, consultar y cerrar un engorde sin imponer duraciones.
 @author Cristian Deysdayr Jimenez
 """
 from datetime import datetime
 from decimal import Decimal
+
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.production.avicultura.models import (
@@ -24,8 +26,11 @@ from apps.production.avicultura.services.access import (
 )
 from apps.production.avicultura.services.events import isolation_balance
 from apps.production.avicultura.services.houses import decimal_text
+
 OPEN_HOUSE = {HouseStatus.DISPONIBLE, HouseStatus.OCUPADO}
 BALANCE_KINDS = {EventKind.MORTALIDAD, EventKind.DESCARTE, EventKind.SALIDA}
+
+
 def list_lots(*, user: User, farm_id: int, house_id: int | None = None):
     """Lotes de la finca, el más reciente primero."""
     require_membership(user=user, farm_id=farm_id)
@@ -33,6 +38,8 @@ def list_lots(*, user: User, farm_id: int, house_id: int | None = None):
     if house_id is not None:
         queryset = queryset.filter(house_id=house_id)
     return queryset
+
+
 def open_lot(*, user: User, farm_id: int, **data) -> Lot:
     """Recibe un lote y ocupa el galpón."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -89,6 +96,36 @@ def open_lot(*, user: User, farm_id: int, **data) -> Lot:
     except IntegrityError as exc:
         raise AppError("ya existe un lote con ese código", 409) from exc
     return lot
+
+
+def close_lot(*, user: User, farm_id: int, lot_id: int, note: str = "") -> Lot:
+    """Cierra el lote, guarda el resumen y deja el galpón disponible."""
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_close(membership)
+    with transaction.atomic():
+        lot = (
+            Lot.objects.select_for_update()
+            .select_related("house")
+            .filter(id=lot_id, farm_id=farm_id)
+            .first()
+        )
+        if lot is None:
+            raise AppError("lote no encontrado", 404)
+        if lot.status != LotStatus.ABIERTO:
+            raise AppError("el lote ya está cerrado", 400)
+        lot.status = LotStatus.CERRADO
+        lot.closed_at = timezone.now()
+        lot.close_summary = summarize(lot)
+        lot.close_summary["nota_cierre"] = (note or "").strip()[:500]
+        lot.save(update_fields=["status", "closed_at", "close_summary"])
+        house = lot.house
+        quedan_abiertos = house.lots.exclude(id=lot.id).filter(status=LotStatus.ABIERTO).exists()
+        if not quedan_abiertos:
+            house.status = HouseStatus.DISPONIBLE
+            house.save(update_fields=["status", "updated_at"])
+    return lot
+
+
 def update_lot(*, user: User, farm_id: int, lot_id: int, **data) -> Lot:
     """Corrige los datos de recepción del lote sin tocar el saldo de aves."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -130,6 +167,8 @@ def update_lot(*, user: User, farm_id: int, lot_id: int, **data) -> Lot:
     except IntegrityError as exc:
         raise AppError("ya existe un lote con ese código", 409) from exc
     return lot
+
+
 def delete_lot(*, user: User, farm_id: int, lot_id: int) -> None:
     """Elimina el lote con su bitácora. El galpón vuelve a quedar disponible."""
     membership = require_membership(user=user, farm_id=farm_id)
@@ -150,6 +189,36 @@ def delete_lot(*, user: User, farm_id: int, lot_id: int) -> None:
             if not house.lots.filter(status=LotStatus.ABIERTO).exists():
                 house.status = HouseStatus.DISPONIBLE
                 house.save(update_fields=["status", "updated_at"])
+
+
+def reopen_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
+    """Reabre un lote que se cerró por error.
+
+    Es la forma de volver atrás: el lote sigue abierto y el galpón vuelve
+    a estar ocupado.
+    """
+    membership = require_membership(user=user, farm_id=farm_id)
+    require_close(membership)
+    with transaction.atomic():
+        lot = (
+            Lot.objects.select_for_update()
+            .select_related("house")
+            .filter(id=lot_id, farm_id=farm_id)
+            .first()
+        )
+        if lot is None:
+            raise AppError("lote no encontrado", 404)
+        if lot.status != LotStatus.CERRADO:
+            raise AppError("ese lote ya está abierto", 400)
+        house = lot.house
+        lot.status = LotStatus.ABIERTO
+        lot.closed_at = None
+        lot.save(update_fields=["status", "closed_at"])
+        house.status = HouseStatus.OCUPADO
+        house.save(update_fields=["status", "updated_at"])
+    return lot
+
+
 def get_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
     """Un lote de la finca."""
     require_membership(user=user, farm_id=farm_id)
@@ -157,6 +226,8 @@ def get_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
     if lot is None:
         raise AppError("lote no encontrado", 404)
     return lot
+
+
 def summarize(lot: Lot) -> dict:
     """Indicadores del lote. Lo estimado no se presenta como exacto."""
     events = list(lot.events.all())
@@ -222,6 +293,8 @@ def summarize(lot: Lot) -> dict:
         "open_alerts": open_alerts,
         "pending": pending,
     }
+
+
 def lot_payload(lot: Lot, *, with_summary: bool = False) -> dict:
     """Ficha del lote."""
     body = {
@@ -252,6 +325,8 @@ def lot_payload(lot: Lot, *, with_summary: bool = False) -> dict:
     if with_summary:
         body["summary"] = summarize(lot)
     return body
+
+
 def _feed(events, house) -> dict:
     by_stage = {}
     measured = Decimal("0")
@@ -273,6 +348,8 @@ def _feed(events, house) -> dict:
         "measured_kg": decimal_text(measured) or "0",
         "estimated": estimated,
     }
+
+
 def _to_kg(event, house) -> Decimal:
     unit = (event.unit or "").lower()
     amount = event.observed_value or Decimal("0")
@@ -287,6 +364,8 @@ def _to_kg(event, house) -> Decimal:
             return Decimal("0")
         return amount * house.bales_per_drum * house.bale_kg
     return Decimal("0")
+
+
 def _series(events, kind: str) -> list[dict]:
     points = [event for event in events if event.kind == kind and event.observed_value is not None]
     points.sort(key=lambda item: item.occurred_at)
@@ -298,6 +377,8 @@ def _series(events, kind: str) -> list[dict]:
         }
         for item in points[-8:]
     ]
+
+
 def _stage_today(lot: Lot) -> str:
     today = timezone.localdate()
     if lot.engorde_on and today >= lot.engorde_on:
@@ -305,14 +386,20 @@ def _stage_today(lot: Lot) -> str:
     if lot.levante_on and today >= lot.levante_on:
         return LotStage.LEVANTE
     return lot.stage
+
+
 def _age(lot: Lot) -> int:
     arrived = timezone.localtime(lot.arrived_at).date()
     return lot.initial_age_days + max((timezone.localdate() - arrived).days, 0)
+
+
 def _count(value, label: str) -> int:
     count = int(value)
     if count <= 0:
         raise AppError(f"{label} deben ser mayores que cero", 400)
     return count
+
+
 def _positive(value, label: str):
     """Convierte a decimal y rechaza valores negativos."""
     if value is None:
@@ -321,16 +408,22 @@ def _positive(value, label: str):
     if amount < 0:
         raise AppError(f"{label} no puede ser negativo", 400)
     return amount
+
+
 def _code(value: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError("el código del lote es obligatorio", 400)
     return clean[:40]
+
+
 def _required(value: str | None, label: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError(f"{label} es obligatorio", 400)
     return clean[:80]
+
+
 def _date(value) -> str | None:
     if value is None:
         return None
