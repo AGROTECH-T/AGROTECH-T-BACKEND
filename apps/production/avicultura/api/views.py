@@ -76,6 +76,28 @@ class LotPatchSerializer(serializers.Serializer):
     receiver_name = serializers.CharField(required=False, allow_blank=True)
 class CloseSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True)
+class EventWriteSerializer(serializers.Serializer):
+    kind = serializers.CharField()
+    occurred_at = serializers.DateTimeField()
+    responsible = serializers.CharField()
+    observed_value = serializers.DecimalField(
+        max_digits=12,
+        decimal_places=3,
+        required=False,
+        allow_null=True,
+    )
+    unit = serializers.CharField(required=False, allow_blank=True)
+    place = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+    origin = serializers.CharField(required=False, allow_blank=True)
+    attention = serializers.CharField(required=False, allow_blank=True)
+    state = serializers.CharField(required=False, allow_blank=True)
+    action = serializers.CharField(required=False, allow_blank=True)
+    assignee = serializers.CharField(required=False, allow_blank=True)
+    follow_up = serializers.DateField(required=False, allow_null=True)
+    estimated = serializers.BooleanField(required=False)
+    confirmed = serializers.BooleanField(required=False)
+    payload = serializers.DictField(required=False)
 class HouseListCreateView(APIView):
     """Galpones de la finca."""
     @extend_schema(tags=["avicultura"])
@@ -194,3 +216,21 @@ class LotReopenView(APIView):
         )
         lot = lot_services.get_lot(user=request.user, farm_id=farm_id, lot_id=lot_id)
         return Response(lot_services.lot_payload(lot, with_summary=True))
+class EventListCreateView(APIView):
+    """Bitácora de un lote."""
+    @extend_schema(request=EventWriteSerializer, tags=["avicultura"])
+    def post(self, request: Request, farm_id: int, lot_id: int) -> Response:
+        serializer = EventWriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        event = event_services.register_event(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+            **serializer.validated_data,
+        )
+        event = event_services.list_events(
+            user=request.user,
+            farm_id=farm_id,
+            lot_id=lot_id,
+        ).get(id=event.id)
+        return Response(event_services.event_payload(event), status=status.HTTP_201_CREATED)

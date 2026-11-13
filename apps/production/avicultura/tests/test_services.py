@@ -99,6 +99,124 @@ def test_codigo_de_lote_unico(user, farm_id):
         _lote(user, farm_id, other.id, code="L-001")
     assert error.value.status_code == 409
 @pytest.mark.django_db
+def test_mortalidad_resta_y_no_deja_saldo_negativo(user, farm_id):
+    """Las bajas bajan el saldo; no se puede restar más aves de las vivas."""
+    house = _galpon(user, farm_id, mortality_alert=3)
+    lot = _lote(user, farm_id, house.id, received=10)
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="mortalidad",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("3"),
+        notes="Tres aves sin vida.",
+    )
+    lot.refresh_from_db()
+    assert lot.live_count == 7
+    with pytest.raises(AppError) as error:
+        event_services.register_event(
+            user=user,
+            farm_id=farm_id,
+            lot_id=lot.id,
+            kind="mortalidad",
+            occurred_at=timezone.now(),
+            responsible="Ana Pérez",
+            observed_value=Decimal("8"),
+        )
+    assert error.value.status_code == 400
+    assert "7" in error.value.message
+@pytest.mark.django_db
+def test_aislamiento_no_resta_saldo(user, farm_id):
+    """Apartar aves no cambia el saldo vivo."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id, received=50)
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="aislamiento",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("4"),
+        notes="Se apartaron por observación.",
+    )
+    lot.refresh_from_db()
+    assert lot.live_count == 50
+    assert lot_services.summarize(lot)["isolated"] == 4
+@pytest.mark.django_db
+def test_aislamiento_devuelve_al_espacio_normal(user, farm_id):
+    """Las aves aisladas bajan al reintegrarlas; no se puede devolver de más."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id, received=50)
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="aislamiento",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("4"),
+        payload={"direccion": "apartar"},
+    )
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="aislamiento",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("4"),
+        payload={"direccion": "devolver"},
+        notes="Ya se recuperaron.",
+    )
+    lot.refresh_from_db()
+    assert lot.live_count == 50
+    assert lot_services.summarize(lot)["isolated"] == 0
+    with pytest.raises(AppError) as error:
+        event_services.register_event(
+            user=user,
+            farm_id=farm_id,
+            lot_id=lot.id,
+            kind="aislamiento",
+            occurred_at=timezone.now(),
+            responsible="Ana Pérez",
+            observed_value=Decimal("1"),
+            payload={"direccion": "devolver"},
+        )
+    assert error.value.status_code == 400
+@pytest.mark.django_db
+def test_ajuste_suma_resta_y_exige_nota(user, farm_id):
+    """El ajuste mueve el saldo solo con dirección y nota."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id, received=20)
+    with pytest.raises(AppError) as error:
+        event_services.register_event(
+            user=user,
+            farm_id=farm_id,
+            lot_id=lot.id,
+            kind="ajuste",
+            occurred_at=timezone.now(),
+            responsible="Ana Pérez",
+            observed_value=Decimal("2"),
+            payload={"direccion": "sumar"},
+        )
+    assert error.value.status_code == 400
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="ajuste",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("2"),
+        notes="Conteo físico: había dos más.",
+        payload={"direccion": "sumar"},
+    )
+    lot.refresh_from_db()
+    assert lot.live_count == 22
+@pytest.mark.django_db
 def test_cierre_deja_disponible_y_reabrir_ocupa(user, farm_id):
     """Al cerrar, el galpón queda disponible; al reabrir, vuelve a ocupado."""
     house = _galpon(user, farm_id)
@@ -123,6 +241,47 @@ def test_borrar_lote_abierto_libera_el_galpon(user, farm_id):
     house.refresh_from_db()
     assert house.status == HouseStatus.DISPONIBLE
 @pytest.mark.django_db
+def test_lote_cerrado_no_acepta_bitacora(user, farm_id):
+    """No se anota en un ciclo ya cerrado."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    lot_services.close_lot(user=user, farm_id=farm_id, lot_id=lot.id)
+    with pytest.raises(AppError) as error:
+        event_services.register_event(
+            user=user,
+            farm_id=farm_id,
+            lot_id=lot.id,
+            kind="ronda",
+            occurred_at=timezone.now(),
+            responsible="Ana Pérez",
+            notes="Ronda tarde.",
+        )
+    assert error.value.status_code == 400
+@pytest.mark.django_db
+def test_aviso_por_umbral_y_cierre(user, farm_id):
+    """Al llegar al umbral se abre un aviso; cerrarlo pide el permiso de ciclo."""
+    house = _galpon(user, farm_id, mortality_alert=3)
+    lot = _lote(user, farm_id, house.id, received=40)
+    event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="mortalidad",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        observed_value=Decimal("3"),
+        notes="Tres bajas del día.",
+    )
+    alerts = list(event_services.list_alerts(user=user, farm_id=farm_id))
+    assert len(alerts) == 1
+    closed = event_services.close_alert(
+        user=user,
+        farm_id=farm_id,
+        alert_id=alerts[0].id,
+        follow_up="Revisado en ronda.",
+    )
+    assert closed.state == AlertState.CERRADA
+@pytest.mark.django_db
 def test_consulta_no_cierra_el_ciclo(user, make_user, farm_id):
     """Cerrar lote o aviso exige el permiso de cierre, no solo ver."""
     house = _galpon(user, farm_id)
@@ -136,6 +295,38 @@ def test_consulta_no_cierra_el_ciclo(user, make_user, farm_id):
     with pytest.raises(AppError) as error:
         lot_services.close_lot(user=reader, farm_id=farm_id, lot_id=lot.id)
     assert error.value.status_code == 403
+@pytest.mark.django_db
+def test_peso_sin_cantidad_no_se_guarda(user, farm_id):
+    """Peso, agua o alimento piden cantidad; no basta el responsable."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    with pytest.raises(AppError) as error:
+        event_services.register_event(
+            user=user,
+            farm_id=farm_id,
+            lot_id=lot.id,
+            kind="peso",
+            occurred_at=timezone.now(),
+            responsible="Ana Pérez",
+        )
+    assert error.value.status_code == 400
+    assert "cantidad" in error.value.message
+@pytest.mark.django_db
+def test_ronda_sin_cantidad_si_se_guarda(user, farm_id):
+    """La ronda no pide cifra; sí el responsable."""
+    house = _galpon(user, farm_id)
+    lot = _lote(user, farm_id, house.id)
+    event = event_services.register_event(
+        user=user,
+        farm_id=farm_id,
+        lot_id=lot.id,
+        kind="ronda",
+        occurred_at=timezone.now(),
+        responsible="Ana Pérez",
+        notes="Aves activas.",
+    )
+    assert event.kind == "ronda"
+    assert event.observed_value is None
 @pytest.mark.django_db
 def test_actualiza_y_borra_un_galpon(user, farm_id):
     """Se puede cambiar el nombre y luego quitar el galpón."""
