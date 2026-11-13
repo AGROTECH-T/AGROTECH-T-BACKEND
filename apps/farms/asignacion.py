@@ -47,6 +47,35 @@ def cambiar_rol(*, actor: User, user_id: int, farm_id: int, role: str) -> dict:
     farm_ids = _fincas_administradas(actor)
     person = _persona(actor, farm_ids, user_id)
     return _ficha_detalle(actor, person, farm_ids)
+def crear_persona(*, actor: User, datos: dict) -> dict:
+    """Crea la cuenta y la membresía en cada finca elegida."""
+    farm_ids = datos.get("farm_ids") or [datos["farm_id"]]
+    for farm_id in farm_ids:
+        _exigir_finca_administrada(actor, farm_id)
+    permisos = datos.get("permisos") or []
+    _exigir_permisos(permisos)
+    if User.objects.filter(identification=datos["identification"]).exists():
+        raise AppError("ya existe una cuenta con ese documento", 409)
+    with transaction.atomic():
+        person = User.objects.create(
+            first_name=datos["first_name"],
+            last_name=datos["last_name"],
+            identification=datos["identification"],
+            phone=datos.get("phone", ""),
+            correo=datos["correo"],
+            password_hash=make_password(datos["password"]),
+        )
+        for farm_id in farm_ids:
+            membership = FarmMembership.objects.create(
+                farm_id=farm_id,
+                user=person,
+                role=datos["role"],
+            )
+            for permission in permisos:
+                if farm_permissions.tiene_permiso(membership, permission):
+                    raise AppError("el rol de esa persona ya permite esa acción", 400)
+                FarmPermission.objects.create(membership=membership, permission=permission)
+    return _ficha_detalle(actor, person, _fincas_administradas(actor))
 def _fincas_administradas(actor: User) -> list[int]:
     """Identificadores de fincas donde el actor es administrador."""
     return list(
@@ -62,6 +91,11 @@ def _es_administrador(actor: User, farm_id: int) -> bool:
         farm_id=farm_id,
         role=FarmRole.ADMINISTRADOR,
     ).exists()
+def _exigir_finca_administrada(actor: User, farm_id: int) -> None:
+    """Responde 403 si pertenece sin ser admin, o 404 si la finca no es suya."""
+    if _es_administrador(actor, farm_id):
+        return
+    _rechazar_finca(actor, farm_id)
 def _rechazar_finca(actor: User, farm_id: int) -> None:
     """Distingue entre finca ajena y finca propia sin permiso."""
     pertenece = FarmMembership.objects.filter(user=actor, farm_id=farm_id).exists()
@@ -103,6 +137,11 @@ def _conservar_administrador(membership: FarmMembership, role: str) -> None:
     )
     if not queda_otro:
         raise AppError("la finca debe conservar un administrador", 400)
+def _exigir_permisos(permisos: list[str]) -> None:
+    """Valida que cada permiso directo exista en el catálogo asignable."""
+    for permission in permisos:
+        if permission not in _IDS_ASIGNABLES:
+            raise AppError("ese permiso no se puede asignar", 400)
 def _agrupar(
     actor: User,
     farm_ids: list[int],

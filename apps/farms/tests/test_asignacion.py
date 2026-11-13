@@ -116,6 +116,40 @@ def test_no_cambia_una_finca_ajena(make_user, login):
     )
 
     assert response.status_code == 404
+def _alta() -> dict:
+    return {
+        "first_name": "Luz",
+        "last_name": "Rojas",
+        "identification": "1098765432",
+        "correo": "luz.rojas@example.com",
+        "password": "Secure1!",
+        "role": FarmRole.OPERADOR,
+    }
+@pytest.mark.django_db
+def test_crea_persona_con_rol_en_la_finca(make_user, login):
+    """El alta deja a la persona con el rol elegido en esa finca."""
+    admin = make_user("11000001", first_name="Ada", last_name="Admin")
+    finca = _finca("El valle")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+
+    response = login(admin).post(LISTA, {**_alta(), "farm_id": finca.id}, format="json")
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["nombre"] == "Luz Rojas"
+    assert body["membresias"][0]["role"] == FarmRole.OPERADOR
+    assert body["membresias"][0]["farm_id"] == finca.id
+@pytest.mark.django_db
+def test_no_crea_persona_con_documento_repetido(make_user, login):
+    """El mismo documento no se registra dos veces."""
+    admin = make_user("11000011", first_name="Ada", last_name="Admin")
+    finca = _finca("El valle")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+    login(admin).post(LISTA, {**_alta(), "farm_id": finca.id}, format="json")
+
+    response = login(admin).post(LISTA, {**_alta(), "farm_id": finca.id}, format="json")
+
+    assert response.status_code == 409
 @pytest.mark.django_db
 def test_ve_el_detalle_de_una_persona(make_user, login):
     """La ficha trae el rol y si la cuenta está activa."""

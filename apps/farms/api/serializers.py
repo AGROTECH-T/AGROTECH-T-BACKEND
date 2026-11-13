@@ -72,6 +72,33 @@ class CambiarRolSerializer(serializers.Serializer):
 
     farm_id = serializers.IntegerField(min_value=1)
     role = serializers.ChoiceField(choices=FarmRole.values)
+class CrearUsuarioSerializer(serializers.Serializer):
+    """Datos básicos de la cuenta nueva, su rol y sus permisos extra."""
+
+    first_name = serializers.CharField(max_length=40)
+    last_name = serializers.CharField(max_length=40)
+    identification = serializers.CharField(max_length=30)
+    correo = serializers.EmailField()
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    farm_id = serializers.IntegerField(min_value=1, required=False)
+    farm_ids = serializers.ListField(child=serializers.IntegerField(min_value=1), required=False)
+    role = serializers.ChoiceField(choices=FarmRole.values)
+    permisos = serializers.ListField(child=serializers.CharField(max_length=40), required=False)
+
+    def validate(self, attrs: dict) -> dict:
+        """Normaliza los datos y exige una contraseña fuerte."""
+        attrs["first_name"] = normalize_name(attrs["first_name"], "primer nombre")
+        attrs["last_name"] = normalize_name(attrs["last_name"], "primer apellido")
+        attrs["identification"] = normalize_identification(attrs["identification"])
+        attrs["correo"] = attrs["correo"].strip().lower()
+        attrs["phone"] = normalize_phone(attrs.get("phone") or "") if attrs.get("phone") else ""
+        attrs["password"] = validate_password_strength(attrs["password"])
+        ids = attrs.get("farm_ids") or ([attrs["farm_id"]] if attrs.get("farm_id") else [])
+        if not ids:
+            raise serializers.ValidationError("elige al menos una finca")
+        attrs["farm_ids"] = list(dict.fromkeys(ids))
+        return attrs
 class RolesPermisosSerializer(serializers.Serializer):
     """Documenta el catálogo completo que consume Configuración."""
 

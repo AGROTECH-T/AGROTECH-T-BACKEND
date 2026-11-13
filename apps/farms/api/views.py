@@ -36,6 +36,17 @@ class AsignacionRolesView(APIView):
         """Devuelve personas y roles solo de las fincas administradas."""
         search = (request.query_params.get("search") or "").strip()[:60]
         return Response(asignacion.listar_personas(request.user, search=search))
+    @extend_schema(
+        request=CrearUsuarioSerializer,
+        responses={201: UsuarioAsignadoSerializer},
+        tags=["Configuración"],
+    )
+    def post(self, request: Request) -> Response:
+        """Crea una cuenta con su rol y sus permisos directos."""
+        payload = CrearUsuarioSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        persona = asignacion.crear_persona(actor=request.user, datos=payload.validated_data)
+        return Response(persona, status=201)
 class DetalleUsuarioView(APIView):
     """Muestra el rol y los permisos de una persona."""
 
