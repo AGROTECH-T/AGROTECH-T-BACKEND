@@ -70,6 +70,7 @@ AUTHORIZED_MIGRATIONS = frozenset(
         ("trazabilidad", "0006_alter_auditevent_event_type"),
         ("trazabilidad", "0007_alter_auditevent_event_type"),
         ("trazabilidad", "0008_alter_auditevent_event_type"),
+        ("trazabilidad", "0009_alter_auditevent_event_type"),
     }
 )
 
@@ -77,7 +78,7 @@ TERMINAL_MIGRATIONS = frozenset(
     {
         ("accounts", "0006_user_can_create_farms"),
         ("farms", "0005_farminvitation_code_hash"),
-        ("trazabilidad", "0008_alter_auditevent_event_type"),
+        ("trazabilidad", "0009_alter_auditevent_event_type"),
     }
 )
 

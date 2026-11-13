@@ -31,7 +31,7 @@ Versión del código descrita (SHA-256):
 | `docker-compose.disposable.redis.yml` | `0D48D7E851C429939E36746845822E6AA3182F666581767274DCCBADCFA847C0` (F10.3.4-A, solo con `-WithRedis`) |
 | `config/disposable_preflight.py` | `AF200113B9D14337347B1FF48A67E07DA18AFF8172FC940788BC0BFB45238A3B` (F10.3.4-A: comprobación `redis`) |
 | `config/settings_test_disposable.py` | `521E8BC67CB4488EEFA53666F8E4B251B89936FD4D5A00450A5644958B977538` (F10.3.4-A: caché Redis desechable opcional) |
-| `config/settings_test_disposable_isolated.py` | `2F4267F37DAFACD449E24BA59A582E72FCFC55B9A9490A57987595DF2D3ADCE6` (BUILD F6: añade `accounts.0006` y `trazabilidad.0008` al grafo autorizado) |
+| `config/settings_test_disposable_isolated.py` | `BABC567C8944666A97755929CCA748683313E3E2F201404D2994827CCDF1E53A` (BUILD IoT-02.2: añade `trazabilidad.0009` al grafo autorizado y como nodo terminal; antes BUILD F6 con `accounts.0006` y `trazabilidad.0008`) |
 | `conftest.py` | `6F0EE04FE174717A79EB75C9084AE52C1DF4528A5B0CEA747A71AD562A81FD42` |
 
 Si alguno de estos archivos cambia, hay que revisar esta guía.

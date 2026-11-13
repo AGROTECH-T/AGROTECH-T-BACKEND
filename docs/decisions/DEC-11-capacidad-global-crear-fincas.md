@@ -47,6 +47,8 @@ independencia del rol que tengan en otras fincas.
    `can_edit_farm`, `can_deactivate_farm`, `can_reactivate_farm`,
    `can_view_history`, `can_manage_members`, `can_manage_invitations`,
    `can_read_inventory`, `can_write_inventory`.
+   IoT-02.2 añadió dos claves más, `can_read_iot` y `can_manage_iot` (diez en
+   total); ver DEC-13 §11.
    - Son informativas para la interfaz; la autorización real sigue en cada
      servicio. Nunca se aceptan desde el cliente.
    - `INVENTORY_WRITE_ROLES` es la fuente única de los roles que escriben

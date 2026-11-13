@@ -46,7 +46,7 @@ lectura.
 
 ### Capacidades por finca (`capabilities`)
 
-Objeto de solo lectura con **ocho** booleanos obligatorios. Son informativos para
+Objeto de solo lectura con **diez** booleanos obligatorios. Son informativos para
 la interfaz: cada endpoint sigue aplicando su propia autorización.
 
 | Clave | Verdadera cuando |
@@ -59,6 +59,8 @@ la interfaz: cada endpoint sigue aplicando su propia autorización.
 | `can_manage_invitations` | Administrador activo, finca activa y cuenta activa |
 | `can_read_inventory` | Membresía activa y finca activa |
 | `can_write_inventory` | Lo anterior y rol `administrador` u `operador` |
+| `can_read_iot` | Membresía activa y finca activa (DEC-13) |
+| `can_manage_iot` | Lo anterior, rol `administrador` y cuenta activa (DEC-13) |
 
 No existe `can_leave_farm`, por decisión (DEC-11): abandonar depende de no ser el
 último administrador, regla que solo comprueba `POST /farms/{id}/leave/`, que puede
@@ -199,6 +201,30 @@ consulta es de solo lectura y **no reactiva** la finca.
 - `404`: la finca no existe o la cuenta no es administrador
 
 Parámetros de paginación: `page` y `page_size` (máximo 100; por defecto 20).
+
+### Eventos IoT en el historial (DEC-13, IoT-02.2)
+
+El historial incluye todos los eventos de auditoría de la finca, también los
+del módulo IoT. La política de acceso no cambia: solo el administrador actual.
+
+| `event_type` | `entity_type` | `entity_id` |
+|---|---|---|
+| `iot_gateway_created`, `iot_gateway_deactivated`, `iot_gateway_reactivated` | `iot_gateway` | `uid` público (`GW-…`) |
+| `iot_coordinator_created`, `iot_coordinator_deactivated`, `iot_coordinator_reactivated` | `iot_coordinator` | `uid` público (`CO-…`) |
+| `iot_sensor_created`, `iot_sensor_deactivated`, `iot_sensor_reactivated` | `iot_sensor` | `uid` público (`SN-…`) |
+| `iot_gateway_authorized`, `iot_gateway_authorization_revoked` | `iot_coordinator_gateway` | identificador interno de la autorización |
+
+Información visible en `before_data` / `after_data`: `uid`, `name`,
+`location_label` e `is_active` de gateways y coordinadores; `uid`,
+`coordinator_uid`, `channel`, `metric` e `is_active` de sensores;
+`coordinator_uid`, `gateway_uid` y `active` de autorizaciones. `reason` lleva el
+motivo indicado. Nunca contiene claves HMAC, credenciales MQTT ni secretos. Las
+desactivaciones en cascada se distinguen por su causa en los metadatos
+internos (`metadata`), que este endpoint no expone.
+
+Pendiente (DEC-13 §11): el resto de la trazabilidad usa la clave interna como
+`entity_id`; los dispositivos IoT usan su `uid` público. Unificar el criterio
+requiere una decisión.
 
 ## Historial de una membresía
 

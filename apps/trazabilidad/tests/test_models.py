@@ -38,6 +38,17 @@ def test_event_catalog_is_exact():
         "member_reactivated",
         "farm_creation_granted",
         "farm_creation_revoked",
+        "iot_gateway_created",
+        "iot_gateway_deactivated",
+        "iot_gateway_reactivated",
+        "iot_coordinator_created",
+        "iot_coordinator_deactivated",
+        "iot_coordinator_reactivated",
+        "iot_sensor_created",
+        "iot_sensor_deactivated",
+        "iot_sensor_reactivated",
+        "iot_gateway_authorized",
+        "iot_gateway_authorization_revoked",
     ]
 
 

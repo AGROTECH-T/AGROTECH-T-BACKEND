@@ -3,9 +3,10 @@
 - **Identificador:** DEC-13
 - **Título:** Arquitectura y contratos técnicos del módulo IoT
 - **Estado de decisión:** Aprobada (parcial: los puntos de §6 siguen pendientes)
-- **Estado de implementación:** Parcial. IoT-02.1 implementa catálogo,
-  identificadores y exigencia de MariaDB (§10); sin modelos ni migraciones.
-- **Alcance:** BUILD IoT-01, IoT-02.1
+- **Estado de implementación:** Parcial. IoT-02.1: catálogo, identificadores y
+  exigencia de MariaDB (§10). IoT-02.2: modelos, FK compuestas, servicios,
+  capacidades y auditoría (§11). Sin MQTT, API REST ni telemetría.
+- **Alcance:** BUILD IoT-01, IoT-02.1, IoT-02.2
 - **Fecha:** 2026-11-12
 - **Relación:** DEC-01 (desactivación lógica de fincas), DEC-02 (roles por
   membresía), DEC-11 (capacidades por finca)
@@ -133,9 +134,9 @@ implementarse, pero son la base de IoT-02.
 
 ## 9. Brechas de implementación
 
-No existen modelos, migraciones, servicios de administración, consumidor,
-configuración de Mosquitto ni firmware. IoT-02.1 solo aporta los componentes
-de §10.
+No existen consumidor MQTT, configuración de Mosquitto, API REST, recepción de
+mediciones ni firmware. IoT-02.1 y IoT-02.2 aportan los componentes de §10 y
+§11.
 
 ## 10. Implementación IoT-02.1
 
@@ -181,3 +182,115 @@ Explicación sencilla:
 
 Pruebas: `apps/iot/tests/test_catalog.py`, `test_identifiers.py`,
 `test_db_guard.py` (unitarias, sin base de datos).
+
+## 11. Implementación IoT-02.2
+
+### Modelos (`apps/iot/models.py`)
+
+| Modelo | Tabla | Campos principales |
+|---|---|---|
+| `Gateway` | `iot_gateways` | `uid` (GW-), `farm` (PROTECT), `name`, `location_label`, estado y baja |
+| `Coordinator` | `iot_coordinators` | `uid` (CO-), `farm` (PROTECT), `name`, `location_label`, estado y baja |
+| `Sensor` | `iot_sensors` | `uid` (SN-), `farm`, `coordinator` (PROTECT), `channel`, `metric`, `active_channel`, estado y baja |
+| `CoordinatorGateway` | `iot_coordinator_gateways` | `farm`, `coordinator`, `gateway` (PROTECT), `authorized_at/by`, `revoked_at/by`, `active_pair` |
+
+Campos de estado comunes: `is_active`, `created_at`, `updated_at`,
+`created_by`, `deactivated_at`, `deactivated_by` (usuarios con SET_NULL). PK
+`BigAutoField`. La unidad del sensor se deriva del catálogo. No hay modelo de
+grupos ni dependencia de avicultura. El coordinador no tiene conectividad IP.
+
+### Integridad en la base de datos
+
+- `UNIQUE (uid)` en las tres entidades y `CHECK` del formato con
+  `REGEXP` (prefijo, longitud y alfabeto).
+- `CHECK (metric IN (...))` con los códigos de `MetricCode`.
+- Coherencia de estado: activo sin datos de baja; inactivo con fecha de baja.
+- Un sensor activo por canal: `UNIQUE (coordinator, active_channel)`, con
+  `active_channel` = `channel` si está activo y NULL si no.
+- Una autorización vigente por pareja: `UNIQUE (coordinator, gateway,
+  active_pair)`, con `active_pair` = 1 vigente y NULL revocada; `revoked_at >=
+  authorized_at`.
+- Los `CHECK` de la rama "activo" exigen `IS NOT NULL` explícito: en SQL un
+  `CHECK` con resultado NULL se considera cumplido (las pruebas lo detectaron).
+- **FK compuestas** (`iot.0002_composite_farm_fks`, `RunPython` con
+  `atomic=False` porque MariaDB no admite DDL transaccional; idempotente desde
+  IoT-02.2-R2):
+  `iot_sensors (coordinator_id, farm_id)` y `iot_coordinator_gateways
+  (coordinator_id, farm_id)` → `iot_coordinators (id, farm_id)`;
+  `iot_coordinator_gateways (gateway_id, farm_id)` → `iot_gateways (id,
+  farm_id)`, con `ON UPDATE/DELETE RESTRICT`. Se apoyan en `UNIQUE (id, farm)` e
+  índices `(x, farm)` declarados en `0001`. Se ejecutan en MariaDB y PostgreSQL;
+  en SQLite se omiten. Son reversibles.
+- **Idempotencia y recuperación de `iot.0002`:** cada FK se busca en
+  `information_schema` por esquema actual, tabla y nombre. Ausente: se crea (o
+  se omite al revertir). Presente con la definición esperada: se omite (o se
+  elimina al revertir). Presente con otra definición: `RuntimeError` sin tocar
+  nada. Si una ejecución anterior se interrumpió y dejó solo parte de las FK, la
+  migración no quedó registrada: basta con volver a ejecutar `migrate`. Una
+  migración no registrada no se revierte con `migrate iot 0001`; primero se
+  completa y después se revierte.
+- `apps/iot/tests/test_model_support.py` (sin base de datos) vigila que sigan
+  declarados `UNIQUE (id, farm)` y los índices `(x, farm)` que usan las FK.
+- `iot.0001` depende solo de `accounts.0001` y `farms.0001` (como
+  `inventario.0001`), para que revertir migraciones posteriores de esas apps no
+  arrastre a IoT.
+
+### Servicios (`apps/iot/services/`)
+
+- `access.py`: lectura con `require_active_membership`. Escritura, en este
+  orden (IoT-02.2-R2): `lock_active_membership` y rol en `IOT_MANAGE_ROLES`
+  (solo administrador) con cuenta activa → `require_mariadb()` → validación de
+  datos → operación y auditoría. Un no miembro recibe 404 y un integrante sin
+  rol 403 aunque envíe datos inválidos o el motor no sea MariaDB.
+- `devices.py`: alta, consulta, desactivación y reactivación de gateways y
+  coordinadores. `sensors.py`: lo mismo para sensores. `authorizations.py`:
+  autorizar, revocar e historial coordinador–gateway.
+- Orden de bloqueo: Farm → FarmMembership → Coordinator → Gateway → filas
+  dependientes (por PK). El bloqueo de `Farm` serializa las escrituras IoT de
+  una finca.
+- Desactivar un gateway revoca sus autorizaciones vigentes. Desactivar un
+  coordinador revoca sus autorizaciones y desactiva sus sensores.
+- Reactivar gateways, coordinadores y sensores exige motivo, queda auditado y no
+  restaura autorizaciones ni sensores. Un sensor solo se reactiva con su
+  coordinador activo, métrica del catálogo y canal libre.
+- Canal: sin máximo funcional. Se valida contra el rango del tipo de columna en
+  el motor activo (`connection.ops.integer_field_range`): en MariaDB
+  `smallint UNSIGNED`, 0 a 65535. No es un límite de hardware.
+- Recursos de otra finca y `uid` mal formados responden 404.
+- Colisión de `uid`: hasta `MAX_GENERATION_ATTEMPTS` intentos con punto de
+  guardado; después, 500.
+
+### Permisos y auditoría
+
+- `apps/farms/capabilities.py`: `IOT_MANAGE_ROLES = {administrador}`,
+  `can_read_iot` (membresía y finca activas) y `can_manage_iot` (además, rol
+  administrador y cuenta activa). Son diez claves en total. No hay entradas
+  `iot.*` en el catálogo general de permisos.
+- `trazabilidad.0009`: 11 eventos `iot_*` (alta, desactivación y reactivación de
+  cada dispositivo; autorización y revocación). Se registran en la misma
+  transacción; los payloads solo llevan `uid`, nombre, etiqueta, canal, métrica
+  y estado, nunca claves ni credenciales. Las cascadas indican `cause`.
+- `config/settings_test_disposable_isolated.py` incluye `trazabilidad.0009` en
+  su grafo autorizado.
+
+### Pruebas
+
+`apps/iot/tests/test_models.py`, `test_services.py`, `test_permissions.py`,
+`test_concurrency.py` y `test_migrations.py`, ejecutadas solo con el
+orquestador desechable (MariaDB 11.8.8).
+
+### Pendientes
+
+- Límite funcional de canales (cableado y firmware). Hoy solo rige el rango de
+  la columna.
+- **Cobertura de `apps.iot`: no medida.** El orquestador ejecuta pytest con
+  `-o addopts=` y un entorno hijo de lista blanca, sin opción de cobertura; las
+  pruebas con base de datos no pueden ejecutarse fuera de él. Medirla requiere
+  una tarea autorizada independiente (por ejemplo, un modo `-Coverage` del
+  orquestador que escriba los datos en `OutputDirectory`). Una cifra calculada
+  solo con las pruebas estáticas no es representativa.
+- `entity_id` de auditoría: los dispositivos IoT usan su `uid` público y el
+  resto de la trazabilidad, la clave interna (las autorizaciones IoT siguen esta
+  última). Unificar el criterio requiere decisión.
+- Las 16 pruebas Redis de `apps/farms/tests` (`-Validate -WithRedis`) no se
+  ejecutaron en IoT-02.2; IoT no modifica ese código.

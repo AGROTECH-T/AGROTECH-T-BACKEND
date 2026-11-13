@@ -2,7 +2,7 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings_test"
 python_files = ["test_*.py"]
-addopts = "--cov=apps.accounts --cov=apps.farms --cov=apps.trazabilidad --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
+addopts = "--cov=apps.accounts --cov=apps.farms --cov=apps.trazabilidad --cov=apps.iot --cov-fail-under=80 --cov-report=term-missing --cov-report=xml"
 env = ["DJANGO_DEBUG=true", "REDIS_URL=", "BREVO_API_KEY="]
 
 [tool.coverage.run]

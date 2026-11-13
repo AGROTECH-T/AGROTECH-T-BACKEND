@@ -4,8 +4,9 @@ Propósito: exponer a los clientes lo que la cuenta puede hacer, derivado en el
 servidor de las mismas reglas que aplican los servicios (BUILD F6, DEC-11).
 Contexto: las capacidades son informativas para la interfaz. La autorización
 real sigue en cada servicio (update_farm, deactivate_farm, reactivate_farm,
-list_farm_events, _admin_actor_for_membership_op, invitation_services._require_admin
-y apps.inventario.services.membership). Nunca se aceptan desde el cliente.
+list_farm_events, _admin_actor_for_membership_op, invitation_services._require_admin,
+apps.inventario.services.membership y apps.iot.services.access). Nunca se
+aceptan desde el cliente.
 Los permisos granulares de apps.permissions no intervienen (decisión B3).
 """
 from apps.accounts.models import User
@@ -16,6 +17,10 @@ from apps.trazabilidad.models import AuditEvent, EventType
 # apps.inventario.services.membership.
 INVENTORY_WRITE_ROLES = frozenset({FarmRole.ADMINISTRADOR, FarmRole.OPERADOR})
 
+# Roles que administran dispositivos IoT (DEC-13, IoT-02.2); fuente única
+# también para apps.iot.services.access.
+IOT_MANAGE_ROLES = frozenset({FarmRole.ADMINISTRADOR})
+
 CAPABILITY_KEYS = (
     "can_edit_farm",
     "can_deactivate_farm",
@@ -25,6 +30,8 @@ CAPABILITY_KEYS = (
     "can_manage_invitations",
     "can_read_inventory",
     "can_write_inventory",
+    "can_read_iot",
+    "can_manage_iot",
 )
 
 
@@ -45,6 +52,10 @@ def farm_capabilities(membership: FarmMembership) -> dict[str, bool]:
         "can_manage_invitations": manages,
         "can_read_inventory": reads_inventory,
         "can_write_inventory": reads_inventory and membership.role in INVENTORY_WRITE_ROLES,
+        "can_read_iot": reads_inventory,
+        "can_manage_iot": (
+            reads_inventory and account_active and membership.role in IOT_MANAGE_ROLES
+        ),
     }
 
 

@@ -20,7 +20,7 @@
 | [DEC-10](DEC-10-riesgo-toctou-rutas-orquestador.md) | Riesgo TOCTOU residual en rutas del orquestador desechable | Aprobada | Parcial |
 | [DEC-11](DEC-11-capacidad-global-crear-fincas.md) | Capacidad global para crear fincas y capacidades por finca | Aprobada | Implementada en código; base real pendiente |
 | [DEC-12](DEC-12-fijacion-digest-redis-orquestador.md) | Fijación por digest de la imagen Redis del orquestador | Aprobada | Implementada |
-| [DEC-13](DEC-13-arquitectura-iot.md) | Arquitectura y contratos técnicos del módulo IoT | Aprobada (con pendientes) | Parcial: catálogo, identificadores y guarda MariaDB (IoT-02.1) |
+| [DEC-13](DEC-13-arquitectura-iot.md) | Arquitectura y contratos técnicos del módulo IoT | Aprobada (con pendientes) | Parcial: catálogo, identificadores y guarda MariaDB (IoT-02.1); modelos, servicios, capacidades y auditoría (IoT-02.2) |
 
 ## Diseños de módulo
 

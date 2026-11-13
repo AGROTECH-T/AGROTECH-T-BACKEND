@@ -43,6 +43,25 @@ class EventType(models.TextChoices):
     MEMBER_REACTIVATED = "member_reactivated", "Integrante reactivado"
     FARM_CREATION_GRANTED = "farm_creation_granted", "Capacidad de crear fincas concedida"
     FARM_CREATION_REVOKED = "farm_creation_revoked", "Capacidad de crear fincas retirada"
+    # IoT-02.2 (DEC-13): ciclo de vida de dispositivos y autorizaciones. Nunca
+    # telemetría: las mediciones viven en tablas propias de IoT.
+    IOT_GATEWAY_CREATED = "iot_gateway_created", "Gateway IoT registrado"
+    IOT_GATEWAY_DEACTIVATED = "iot_gateway_deactivated", "Gateway IoT desactivado"
+    IOT_GATEWAY_REACTIVATED = "iot_gateway_reactivated", "Gateway IoT reactivado"
+    IOT_COORDINATOR_CREATED = "iot_coordinator_created", "Coordinador IoT registrado"
+    IOT_COORDINATOR_DEACTIVATED = "iot_coordinator_deactivated", "Coordinador IoT desactivado"
+    IOT_COORDINATOR_REACTIVATED = "iot_coordinator_reactivated", "Coordinador IoT reactivado"
+    IOT_SENSOR_CREATED = "iot_sensor_created", "Sensor IoT registrado"
+    IOT_SENSOR_DEACTIVATED = "iot_sensor_deactivated", "Sensor IoT desactivado"
+    IOT_SENSOR_REACTIVATED = "iot_sensor_reactivated", "Sensor IoT reactivado"
+    IOT_GATEWAY_AUTHORIZED = (
+        "iot_gateway_authorized",
+        "Coordinador IoT autorizado en gateway",
+    )
+    IOT_GATEWAY_AUTHORIZATION_REVOKED = (
+        "iot_gateway_authorization_revoked",
+        "Autorización de coordinador en gateway revocada",
+    )
 
 
 class AuditEvent(models.Model):
