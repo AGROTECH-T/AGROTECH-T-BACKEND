@@ -28,7 +28,8 @@ No hay microservicios en esta etapa. No hay múltiples bases de datos.
 | Dominio | Ubicación | Responsabilidad y estado |
 |---|---|---|
 | accounts | `apps/accounts/` | Autenticación implementada: registro, JWE, OTP y sesiones |
-| farms | `apps/farms/` | Fincas y membresías v1 en revisión; permisos por rol pendientes |
+| farms | `apps/farms/` | Fincas, membresías y roles implementados; autorización estructural por rol |
+| permissions | `apps/permissions/` | Catálogo y motor de permisos operativos (motor implementado; integración parcial) |
 | avicultura | `apps/production/avicultura/` | Primer módulo productivo (fase posterior: galpón) |
 | piscicultura | `apps/production/piscicultura/` | Reservado |
 | porcicultura | `apps/production/porcicultura/` | Reservado |
@@ -43,6 +44,29 @@ No hay microservicios en esta etapa. No hay múltiples bases de datos.
 Componentes transversales realmente reutilizables viven en `common/`.
 `common/` no debe convertirse en cajón de basura ni contener lógica
 específica de un dominio.
+
+## 3.1. Autorización: estructural y operativa
+
+La autorización se divide en dos planos independientes:
+
+- **Autorización estructural de administración:** gobierna acciones sobre la
+  propia finca (integrantes, roles, invitaciones, estado y reactivación). Se basa
+  en el rol de la membresía (`ADMIN`, `OPERATOR`, `CONSULTATION`).
+- **Autorización operativa:** gobierna módulos y acciones de negocio. Se calcula
+  con permisos configurables mediante la fórmula:
+
+  `P_effective = (P_role ∩ P_assigned) − P_restricted`
+
+Reglas:
+
+- Los roles funcionan como **techo** de permisos.
+- `apps/permissions/catalog.py` es la **fuente única** de autorización operativa.
+- `apps/farms/role_*.py` se usa **exclusivamente para presentación**, nunca como
+  fuente paralela de autorización.
+- La ausencia de asignación implica denegación una vez completada la migración
+  correspondiente.
+
+Las decisiones asociadas se detallan en `docs/decisions/` (DEC-02, DEC-05).
 
 ## 4. Relación entre backend y frontend
 
