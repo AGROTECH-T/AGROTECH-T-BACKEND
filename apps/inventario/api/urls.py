@@ -26,6 +26,12 @@ from apps.inventario.api.products.list_create_view import ProductListCreateView
 from apps.inventario.api.units.base_view import BaseUnitCreateView, BaseUnitDetailView
 from apps.inventario.api.units.create_view import CustomUnitCreateView
 from apps.inventario.api.units.detail_view import UnitDetailView
+from apps.inventario.api.reports.files import (
+    AdjustmentReportFileView,
+)
+from apps.inventario.api.reports.views import (
+    AdjustmentReportView,
+)
 
 app_name = "inventario"
 
@@ -115,5 +121,15 @@ urlpatterns = [
         "inventory/<int:farm_id>/movements/history.xlsx",
         FarmMovementHistoryFileView.as_view(),
         name="farm-movement-history-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/adjustments/",
+        AdjustmentReportView.as_view(),
+        name="report-adjustments",
+    ),
+    path(
+        "inventory/<int:farm_id>/reports/adjustments.xlsx",
+        AdjustmentReportFileView.as_view(),
+        name="report-adjustments-file",
     ),
 ]
