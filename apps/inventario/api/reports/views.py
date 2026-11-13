@@ -38,6 +38,21 @@ class ConsumptionReportView(APIView):
             product_id=read_product(request.query_params.get("product")),
         )
         return Response(data)
+class LoanReportView(APIView):
+    """Préstamos de la finca y lo que sigue pendiente."""
+
+    @extend_schema(tags=["inventario"])
+    def get(self, request: Request, farm_id: int) -> Response:
+        data = report_services.loan_report(
+            user=request.user,
+            farm_id=farm_id,
+            status=request.query_params.get("status") or "all",
+            date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
+            date_to=optional_date(request.query_params.get("to"), "la fecha final"),
+            person=request.query_params.get("person") or None,
+            product_id=read_product(request.query_params.get("product")),
+        )
+        return Response(with_iso_dates(data))
 def read_product(raw: str | None) -> int | None:
     """Lee el identificador del producto o nada."""
     if not raw:

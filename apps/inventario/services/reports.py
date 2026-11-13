@@ -209,6 +209,89 @@ def consumption_report(
             product_id=product_id,
         ),
     }
+def loan_report(
+    *,
+    user: User,
+    farm_id: int,
+    status: str = "all",
+    date_from: date | None = None,
+    date_to: date | None = None,
+    person: str | None = None,
+    product_id: int | None = None,
+) -> dict:
+    """Préstamos de toda la finca, con lo que sigue pendiente."""
+    _guard(user=user, farm_id=farm_id, date_from=date_from, date_to=date_to)
+    if status not in ("all", "open", "closed"):
+        raise AppError("estado inválido", 400)
+    queryset = ProductLoan.objects.filter(product__farm_id=farm_id).select_related(
+        "product",
+        "product__unit",
+    )
+    queryset = _in_range(queryset, date_from, date_to)
+    if status == "open":
+        queryset = queryset.filter(returned_quantity__lt=F("quantity"))
+    elif status == "closed":
+        queryset = queryset.filter(returned_quantity__gte=F("quantity"))
+    clean_person = (person or "").strip()
+    if clean_person:
+        queryset = queryset.filter(borrower_name__icontains=clean_person)
+    if product_id is not None:
+        queryset = queryset.filter(product_id=product_id)
+
+    rows = []
+    people: dict[str, dict] = {}
+    open_count = 0
+    for loan in queryset:
+        pending = loan.quantity - loan.returned_quantity
+        if pending > ZERO:
+            open_count += 1
+            key = loan.document_number
+            person_row = people.setdefault(
+                key,
+                {
+                    "person": loan.borrower_name,
+                    "document": loan.document_number,
+                    "pending": {},
+                    "loans": 0,
+                },
+            )
+            unit = loan.product.unit.label
+            person_row["pending"][unit] = person_row["pending"].get(unit, ZERO) + pending
+            person_row["loans"] += 1
+        rows.append(
+            {
+                "id": loan.id,
+                "when": loan.created_at,
+                "person": loan.borrower_name,
+                "document": loan.document_number,
+                "product": loan.product.name,
+                "quantity": plain_amount(loan.quantity),
+                "returned": plain_amount(loan.returned_quantity),
+                "pending": plain_amount(pending),
+                "unit": loan.product.unit.label,
+                "state": "Pendiente" if pending > ZERO else "Completo",
+            }
+        )
+    return {
+        "rows": rows,
+        "count": len(rows),
+        "open": open_count,
+        "people": [
+            {
+                "person": item["person"],
+                "document": item["document"],
+                "pending": " · ".join(
+                    f"{plain_amount(amount)} {unit}"
+                    for unit, amount in sorted(item["pending"].items())
+                ),
+                "loans": item["loans"],
+            }
+            for item in sorted(
+                people.values(),
+                key=lambda row: (-row["loans"], row["person"]),
+            )
+        ],
+    }
 def _flow(
     *,
     farm_id: int,

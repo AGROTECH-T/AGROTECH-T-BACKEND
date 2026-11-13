@@ -136,6 +136,58 @@ class ConsumptionReportFileView(APIView):
             ]
         )
         return download(payload, f"consumo-{farm_id}.xlsx")
+class LoanReportFileView(APIView):
+    """Excel de los préstamos de la finca."""
+
+    @extend_schema(tags=["inventario"])
+    def get(self, request: Request, farm_id: int) -> HttpResponse:
+        data = report_services.loan_report(
+            user=request.user,
+            farm_id=farm_id,
+            status=request.query_params.get("status") or "all",
+            date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
+            date_to=optional_date(request.query_params.get("to"), "la fecha final"),
+            person=request.query_params.get("person") or None,
+            product_id=read_product(request.query_params.get("product")),
+        )
+        rows = [
+            [
+                row["person"],
+                row["document"],
+                row["product"],
+                row["quantity"],
+                row["returned"],
+                row["pending"],
+                row["unit"],
+                row["state"],
+                row["when"].strftime("%d/%m/%Y"),
+            ]
+            for row in data["rows"]
+        ]
+        people = [
+            [item["person"], item["document"], item["pending"]] for item in data["people"]
+        ]
+        payload = book(
+            [
+                (
+                    "Préstamos",
+                    [
+                        "Persona",
+                        "Documento",
+                        "Producto",
+                        "Prestado",
+                        "Devuelto",
+                        "Pendiente",
+                        "Unidad",
+                        "Estado",
+                        "Fecha",
+                    ],
+                    rows,
+                ),
+                ("Pendientes", ["Persona", "Documento", "Pendiente"], people),
+            ]
+        )
+        return download(payload, f"prestamos-{farm_id}.xlsx")
 def download(payload: bytes, filename: str) -> HttpResponse:
     """Respuesta de descarga del libro armado."""
     response = HttpResponse(payload, content_type=XLSX)

@@ -103,6 +103,42 @@ def test_reporte_de_consumo_rechaza_rango_invertido(user):
         )
     assert error.value.status_code == 400
 @pytest.mark.django_db
+def test_reporte_de_prestamos_separa_pendientes(user):
+    """Cuenta abiertos y cerrados del préstamo."""
+    farm_id, product = _farm_product(user, name="Concentrado")
+    product = services.create_product(
+        user=user,
+        farm_id=farm_id,
+        name="Bulto",
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
+    )
+    services.register_movement(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        kind=MovementKind.ENTRADA,
+        quantity=Decimal("4"),
+    )
+    loan_services.lend_product(
+        user=user,
+        farm_id=farm_id,
+        product_id=product.id,
+        borrower_name="Ana Pérez",
+        document_number="1234567890",
+        quantity=Decimal("1"),
+    )
+    data = report_services.loan_report(user=user, farm_id=farm_id, status="open")
+    assert data["open"] == 1
+    assert data["count"] == 1
+@pytest.mark.django_db
+def test_reporte_de_prestamos_rechaza_estado_invalido(user):
+    """Solo admite all, open o closed."""
+    farm_id, _product = _farm_product(user)
+    with pytest.raises(AppError) as error:
+        report_services.loan_report(user=user, farm_id=farm_id, status="raro")
+    assert error.value.status_code == 400
+@pytest.mark.django_db
 def test_consulta_puede_leer_reportes(user, make_user):
     """Quien solo consulta ve el reporte; no hace falta ser admin."""
     farm_id, _product = _farm_product(user)
