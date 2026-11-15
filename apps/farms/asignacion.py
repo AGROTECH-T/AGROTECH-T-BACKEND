@@ -247,7 +247,11 @@ def _agrupar(
     search: str = "",
 ) -> list[dict]:
     """Arma una ficha por persona con sus membresías visibles."""
-    consulta = FarmMembership.objects.filter(farm_id__in=farm_ids).select_related("user", "farm")
+    consulta = (
+        FarmMembership.objects.filter(farm_id__in=farm_ids)
+        .select_related("user", "farm")
+        .prefetch_related("extra_permissions")
+    )
     if search:
         consulta = consulta.filter(
             Q(user__first_name__icontains=search)
@@ -263,6 +267,7 @@ def _agrupar(
                 "farm_id": membership.farm_id,
                 "farm_name": membership.farm.name,
                 "role": membership.role,
+                "permisos": sorted(farm_permissions.permisos_efectivos(membership)),
             }
         )
     return list(personas.values())
