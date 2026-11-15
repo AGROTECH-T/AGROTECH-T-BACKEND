@@ -110,6 +110,30 @@ def test_abrir_lote_ocupa_el_galpon(user, farm_id):
 
 
 @pytest.mark.django_db
+def test_galpon_solo_un_lote_activo(user, farm_id):
+    """Con un lote abierto no se recibe otro en el mismo galpón."""
+    house = _galpon(user, farm_id)
+    _lote(user, farm_id, house.id, code="L-001")
+    with pytest.raises(AppError) as error:
+        _lote(user, farm_id, house.id, code="L-002")
+    assert error.value.status_code == 400
+    assert "lote activo" in error.value.message
+
+
+@pytest.mark.django_db
+def test_no_reabre_si_ya_hay_lote_activo(user, farm_id):
+    """Reabrir un lote cerrado no pisa el lote activo del galpón."""
+    house = _galpon(user, farm_id)
+    first = _lote(user, farm_id, house.id, code="L-001")
+    lot_services.close_lot(user=user, farm_id=farm_id, lot_id=first.id)
+    _lote(user, farm_id, house.id, code="L-002")
+    with pytest.raises(AppError) as error:
+        lot_services.reopen_lot(user=user, farm_id=farm_id, lot_id=first.id)
+    assert error.value.status_code == 400
+    assert "lote activo" in error.value.message
+
+
+@pytest.mark.django_db
 def test_codigo_de_lote_unico(user, farm_id):
     """El código no se repite en la finca."""
     house = _galpon(user, farm_id)

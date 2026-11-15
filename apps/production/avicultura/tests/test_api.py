@@ -118,4 +118,67 @@ def test_listar_lotes_y_eventos_por_http(login, user):
     assert lots.status_code == 200
     assert lots.json()[0]["code"] == "L-003"
     assert events.status_code == 200
-    assert events.json()[0]["kind"] == "ronda"
+    body = events.json()
+    assert body["count"] == 1
+    assert body["page"] == 1
+    assert body["results"][0]["kind"] == "ronda"
+    assert body["kinds"]["ronda"] == 1
+
+
+@pytest.mark.django_db
+def test_bitacora_entrega_paginas(login, user):
+    """GET de eventos parte la bitácora y no carga todo de una vez."""
+    from datetime import timedelta
+    from decimal import Decimal
+
+    from apps.production.avicultura.services import events as event_services
+
+    farm_id = create_farm(user=user, name="La Esperanza").farm_id
+    house = house_services.create_house(user=user, farm_id=farm_id, name="Norte")
+    lot = lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        code="L-004",
+        arrived_at=timezone.now(),
+        received=40,
+        receiver_name="Ana Pérez",
+    )
+    now = timezone.now()
+    for index in range(16):
+        if index < 15:
+            event_services.register_event(
+                user=user,
+                farm_id=farm_id,
+                lot_id=lot.id,
+                kind="ronda",
+                occurred_at=now + timedelta(minutes=index),
+                responsible="Ana Pérez",
+                notes="Ronda.",
+            )
+        else:
+            event_services.register_event(
+                user=user,
+                farm_id=farm_id,
+                lot_id=lot.id,
+                kind="agua",
+                occurred_at=now + timedelta(minutes=index),
+                responsible="Ana Pérez",
+                observed_value=Decimal("10"),
+                unit="L",
+                notes="Bebedero.",
+            )
+    client = login(user)
+    first = client.get(f"{_root(farm_id)}/lotes/{lot.id}/eventos/?page=1&page_size=15")
+    assert first.status_code == 200
+    body = first.json()
+    assert body["count"] == 16
+    assert len(body["results"]) == 15
+    assert body["kinds"]["ronda"] == 15
+    assert body["kinds"]["agua"] == 1
+    second = client.get(f"{_root(farm_id)}/lotes/{lot.id}/eventos/?page=2&page_size=15")
+    assert len(second.json()["results"]) == 1
+    water = client.get(f"{_root(farm_id)}/lotes/{lot.id}/eventos/?kind=agua")
+    assert water.json()["count"] == 1
+    assert len(water.json()["results"]) == 1
+    assert client.get(f"{_root(farm_id)}/lotes/{lot.id}/eventos/?page=0").status_code == 400

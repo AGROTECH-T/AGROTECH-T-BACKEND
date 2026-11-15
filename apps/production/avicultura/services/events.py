@@ -7,6 +7,7 @@ y mover el saldo solo con bajas, salidas o ajustes justificados.
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Count
 from django.utils import timezone
 
 from apps.accounts.errors import AppError
@@ -41,6 +42,10 @@ NEEDS_AMOUNT = BALANCE | {
 COUNT_KINDS = BALANCE | {EventKind.AISLAMIENTO, EventKind.AJUSTE}
 
 
+PAGE_SIZE = 15
+PAGE_SIZE_MAX = 50
+
+
 def list_events(*, user: User, farm_id: int, lot_id: int, kind: str = ""):
     """Bitácora de un lote, la más reciente primero."""
     lot = _lot(user=user, farm_id=farm_id, lot_id=lot_id, write=False)
@@ -50,6 +55,55 @@ def list_events(*, user: User, farm_id: int, lot_id: int, kind: str = ""):
             raise AppError("tipo de evento no válido", 400)
         queryset = queryset.filter(kind=kind)
     return queryset
+
+
+def read_page(raw: str | None, *, default: int, label: str, limit: int | None = None) -> int:
+    """Lee un entero positivo de query string."""
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError as exc:
+        raise AppError(f"{label} no es válida", 400) from exc
+    if value < 1:
+        raise AppError(f"{label} no es válida", 400)
+    if limit is not None and value > limit:
+        return limit
+    return value
+
+
+def page_events(
+    *,
+    user: User,
+    farm_id: int,
+    lot_id: int,
+    kind: str = "",
+    page: int = 1,
+    page_size: int = PAGE_SIZE,
+) -> dict:
+    """Una página de bitácora, con totales por tipo para el filtro."""
+    lot = _lot(user=user, farm_id=farm_id, lot_id=lot_id, write=False)
+    base = lot.events.exclude(kind=EventKind.DESCARTE)
+    kinds = {row["kind"]: row["n"] for row in base.values("kind").annotate(n=Count("id"))}
+    queryset = base
+    if kind:
+        if kind not in EventKind.values:
+            raise AppError("tipo de evento no válido", 400)
+        queryset = queryset.filter(kind=kind)
+    total = queryset.count()
+    start = (page - 1) * page_size
+    page_items = (
+        queryset.select_related("created_by")
+        .prefetch_related("corrections")
+        .order_by("-occurred_at", "-id")[start : start + page_size]
+    )
+    return {
+        "count": total,
+        "page": page,
+        "page_size": page_size,
+        "kinds": kinds,
+        "results": [event_payload(event) for event in page_items],
+    }
 
 
 def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent:

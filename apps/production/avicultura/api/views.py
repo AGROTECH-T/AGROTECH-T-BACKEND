@@ -275,13 +275,25 @@ class EventListCreateView(APIView):
 
     @extend_schema(tags=["avicultura"])
     def get(self, request: Request, farm_id: int, lot_id: int) -> Response:
-        events = event_services.list_events(
-            user=request.user,
-            farm_id=farm_id,
-            lot_id=lot_id,
-            kind=request.query_params.get("kind") or "",
+        return Response(
+            event_services.page_events(
+                user=request.user,
+                farm_id=farm_id,
+                lot_id=lot_id,
+                kind=request.query_params.get("kind") or "",
+                page=event_services.read_page(
+                    request.query_params.get("page"),
+                    default=1,
+                    label="página",
+                ),
+                page_size=event_services.read_page(
+                    request.query_params.get("page_size"),
+                    default=event_services.PAGE_SIZE,
+                    label="tamaño de página",
+                    limit=event_services.PAGE_SIZE_MAX,
+                ),
+            )
         )
-        return Response([event_services.event_payload(event) for event in events])
 
     @extend_schema(request=EventWriteSerializer, tags=["avicultura"])
     def post(self, request: Request, farm_id: int, lot_id: int) -> Response:
