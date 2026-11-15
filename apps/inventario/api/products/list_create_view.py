@@ -8,6 +8,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventario.api.paging import page_body, paginate
 from apps.inventario.api.products.serializers import (
     ErrorSerializer,
     ProductCreateSerializer,
@@ -34,7 +35,15 @@ class ProductListCreateView(APIView):
             status=request.query_params.get("status") or None,
             order=request.query_params.get("order") or "name",
         )
-        return Response(ProductResponseSerializer(products, many=True).data)
+        page, page_size, total, items = paginate(products, request)
+        return Response(
+            page_body(
+                ProductResponseSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
+        )
 
     @extend_schema(
         tags=["inventario"],

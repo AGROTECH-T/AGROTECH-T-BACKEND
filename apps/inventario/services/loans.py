@@ -18,6 +18,8 @@ from apps.inventario.services.permissions import READ, WRITE_STOCK, require_acti
 
 ZERO = Decimal("0")
 DOCUMENT = re.compile(r"^\d{5,15}$")
+LOAN_PREFIX = "Préstamo: "
+RETURN_PREFIX = "Devolución: "
 LOAN_NOTE = re.compile(
     r"^(?P<kind>Préstamo|Devolución): (?P<name>.+) "
     r"\((?P<document>\d+)\)(?:\. (?P<observation>.*))?$"
@@ -60,7 +62,7 @@ def lend_product(
             product_id=product_id,
             kind=MovementKind.SALIDA,
             quantity=quantity,
-            note=f"Préstamo: {name} ({document})",
+            note=f"{LOAN_PREFIX}{name} ({document})",
         )
         loan = ProductLoan.objects.create(
             product_id=product_id,
@@ -112,7 +114,7 @@ def return_loan(
 
 def _return_note(name: str, document: str, extra: str) -> str:
     """Nota de la devolución, con la observación si la escribieron."""
-    text = f"Devolución: {name} ({document})"
+    text = f"{RETURN_PREFIX}{name} ({document})"
     clean = extra.strip()
     if clean:
         text = f"{text}. {clean}"
