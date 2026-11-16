@@ -20,6 +20,7 @@ from apps.accounts.services.platform_admin import (
     crear_administrador,
     listar_administradores,
     promover_administrador,
+    quitar_administrador,
 )
 from apps.accounts.tests.constants import VALID_CREDENTIAL
 from apps.farms.models import Farm, FarmMembership, FarmRole
@@ -209,6 +210,28 @@ def test_api_promover_cuenta(super_client, user):
     assert response.status_code == 200
     user.refresh_from_db()
     assert user.is_administrador is True
+
+
+@pytest.mark.django_db
+def test_quita_administrador(superadmin, user):
+    """El superadmin puede retirar el permiso de administrador."""
+    user.is_administrador = True
+    user.save(update_fields=["is_administrador"])
+    ficha = quitar_administrador(actor=superadmin, user_id=user.id)
+    user.refresh_from_db()
+    assert user.is_administrador is False
+    assert ficha["is_administrador"] is False
+
+
+@pytest.mark.django_db
+def test_api_quitar_administrador(super_client, user):
+    """El endpoint retira el nombramiento."""
+    user.is_administrador = True
+    user.save(update_fields=["is_administrador"])
+    response = super_client.post(f"{ADMINS}{user.id}/quitar/", format="json")
+    assert response.status_code == 200
+    user.refresh_from_db()
+    assert user.is_administrador is False
 
 
 @pytest.mark.django_db

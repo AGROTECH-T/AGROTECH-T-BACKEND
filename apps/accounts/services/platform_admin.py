@@ -61,6 +61,21 @@ def promover_administrador(*, actor: User, user_id: int) -> dict:
     return _ficha(person)
 
 
+def quitar_administrador(*, actor: User, user_id: int) -> dict:
+    """Retira el permiso de administrador de plataforma."""
+    _exigir_superadmin(actor)
+    person = User.objects.filter(id=user_id).first()
+    if person is None:
+        raise AppError("esa cuenta no existe", 404)
+    if person.is_superadmin:
+        raise AppError("esa cuenta es el super administrador", 400)
+    if not person.is_administrador:
+        raise AppError("esa cuenta no es administradora", 400)
+    person.is_administrador = False
+    person.save(update_fields=["is_administrador"])
+    return _ficha(person)
+
+
 def _exigir_superadmin(actor: User) -> None:
     """Corta si la sesión no es el superadmin sembrado."""
     if not actor.is_superadmin:

@@ -6,7 +6,11 @@
 from django.urls import path
 
 from apps.accounts.api.confirm_view import ConfirmCodeView
-from apps.accounts.api.platform_views import AdministradoresView, PromoverAdministradorView
+from apps.accounts.api.platform_views import (
+    AdministradoresView,
+    PromoverAdministradorView,
+    QuitarAdministradorView,
+)
 from apps.accounts.api.views import (
     LoginView,
     LogoutView,
@@ -37,5 +41,10 @@ urlpatterns = [
         "configuracion/administradores/<int:user_id>/promover/",
         PromoverAdministradorView.as_view(),
         name="configuracion-promover-administrador",
+    ),
+    path(
+        "configuracion/administradores/<int:user_id>/quitar/",
+        QuitarAdministradorView.as_view(),
+        name="configuracion-quitar-administrador",
     ),
 ]
