@@ -5,7 +5,7 @@ Propósito: cubrir alta, repetición y errores de datos del comando.
 Contexto: esa cuenta solo nombra administradores; no abre fincas.
 """
 import pytest
-from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import check_password, make_password
 from django.core.management import call_command
 from rest_framework.serializers import ValidationError
 
@@ -121,6 +121,21 @@ def test_seeders_repite_sin_duplicar():
     assert User.objects.filter(
         identification=USUARIOS_INICIALES[0]["identification"]
     ).count() == 1
+
+
+@pytest.mark.django_db
+def test_seeders_no_pisa_la_clave_cambiada():
+    """La clave que la persona cambie sobrevive a un nuevo arranque."""
+    inicial = USUARIOS_INICIALES[0]
+    seed_usuarios_iniciales()
+    user = User.objects.get(identification=inicial["identification"])
+    user.password_hash = make_password("OtraClave1!")
+    user.save(update_fields=["password_hash"])
+
+    seed_usuarios_iniciales()
+    user.refresh_from_db()
+
+    assert check_password("OtraClave1!", user.password_hash)
 
 
 @pytest.mark.django_db

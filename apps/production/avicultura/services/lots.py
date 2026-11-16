@@ -29,6 +29,7 @@ from apps.production.avicultura.services.houses import decimal_text
 
 OPEN_HOUSE = {HouseStatus.DISPONIBLE, HouseStatus.OCUPADO}
 BALANCE_KINDS = {EventKind.MORTALIDAD, EventKind.DESCARTE, EventKind.SALIDA}
+ACTIVE_LOT = "este galpón ya tiene un lote activo"
 
 
 def list_lots(*, user: User, farm_id: int, house_id: int | None = None):
@@ -70,6 +71,7 @@ def open_lot(*, user: User, farm_id: int, **data) -> Lot:
                 raise AppError("galpón no encontrado", 404)
             if house.status not in OPEN_HOUSE:
                 raise AppError("el galpón no está disponible para un lote nuevo", 400)
+            _reject_if_open(house)
             lot = Lot.objects.create(
                 farm_id=farm_id,
                 house=house,
@@ -210,7 +212,8 @@ def reopen_lot(*, user: User, farm_id: int, lot_id: int) -> Lot:
             raise AppError("lote no encontrado", 404)
         if lot.status != LotStatus.CERRADO:
             raise AppError("ese lote ya está abierto", 400)
-        house = lot.house
+        house = House.objects.select_for_update().get(pk=lot.house_id)
+        _reject_if_open(house)
         lot.status = LotStatus.ABIERTO
         lot.closed_at = None
         lot.save(update_fields=["status", "closed_at"])
@@ -408,6 +411,12 @@ def _positive(value, label: str):
     if amount < 0:
         raise AppError(f"{label} no puede ser negativo", 400)
     return amount
+
+
+def _reject_if_open(house: House) -> None:
+    """Un galpón no puede tener más de un lote activo."""
+    if house.lots.filter(status=LotStatus.ABIERTO).exists():
+        raise AppError(ACTIVE_LOT, 400)
 
 
 def _code(value: str) -> str:

@@ -49,10 +49,6 @@ AUTENTICACIÓN .............................. ● REGISTRO, JWE, OTP Y SESIÓN
 | 👤 CUENTAS | `apps/accounts/` | 🟢 ACTIVO | Registro, sesión JWE, OTP y recuperación |
 | 🏡 FINCAS | `apps/farms/` | 🟡 V1 EN REVISIÓN | Fincas, membresías y roles base · sin permisos por rol |
 | 🐔 AVICULTURA | `apps/production/avicultura/` | 🟡 ANDAMIAJE | 🔵 SIGUIENTE · primer módulo productivo |
-| 🐟 PISCICULTURA | `apps/production/piscicultura/` | 🟡 ANDAMIAJE | Reservado |
-| 🐖 PORCICULTURA | `apps/production/porcicultura/` | 🟡 ANDAMIAJE | Reservado |
-| 🌱 AGRICULTURA | `apps/production/agricultura/` | 🟡 ANDAMIAJE | Reservado |
-| 💧 HIDROPONIA | `apps/production/hidroponia/` | 🟡 ANDAMIAJE | Reservado |
 | 📦 INVENTARIO | `apps/inventario/` | 🟡 ANDAMIAJE | Cristian · sin implementar |
 | 📊 PANEL | `apps/dashboard/` | 🟡 ANDAMIAJE | Reservado |
 | 🚨 ALERTAS | `apps/alertas/` | 🟡 ANDAMIAJE | Reservado |
@@ -120,11 +116,7 @@ apps/
 ├── 🏡 farms/
 │
 ├── 🌾 production/
-│   ├── 🐔 avicultura/ ...... 🔵 SIGUIENTE
-│   ├── 🐟 piscicultura/
-│   ├── 🐖 porcicultura/
-│   ├── 🌱 agricultura/
-│   └── 💧 hidroponia/
+│   └── 🐔 avicultura/ ...... 🔵 SIGUIENTE
 │
 ├── 📦 inventario/
 ├── 📊 dashboard/
@@ -148,10 +140,6 @@ apps/
 | MÓDULO | RUTA | ESTADO |
 |:-------|:-----|:-------|
 | 🐔 AVICULTURA | `apps/production/avicultura/` | 🔵 SIGUIENTE · primer módulo productivo a desarrollar |
-| 🐟 PISCICULTURA | `apps/production/piscicultura/` | ⚪ RESERVADO |
-| 🐖 PORCICULTURA | `apps/production/porcicultura/` | ⚪ RESERVADO |
-| 🌱 AGRICULTURA | `apps/production/agricultura/` | ⚪ RESERVADO |
-| 💧 HIDROPONIA | `apps/production/hidroponia/` | ⚪ RESERVADO |
 
 **🐔 AVICULTURA / GALPÓN es el primer módulo productivo programado — aún sin lógica de negocio definida ni implementada.**
 
@@ -277,10 +265,6 @@ feature/* ................... ● DESARROLLO AISLADO
 | ✅ | AUTENTICACIÓN · dominio de cuentas |
 | 🟡 | MULTI-FINCA · v1 en revisión |
 | 🔄 | AVICULTURA · primer módulo productivo |
-| ⬜ | PISCICULTURA |
-| ⬜ | PORCICULTURA |
-| ⬜ | AGRICULTURA |
-| ⬜ | HIDROPONIA |
 | ⬜ | INVENTARIO |
 | ⬜ | PANEL |
 | ⬜ | ALERTAS |

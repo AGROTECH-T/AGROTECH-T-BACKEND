@@ -52,3 +52,16 @@ class PromoverAdministradorView(APIView):
             user_id=user_id,
         )
         return Response(persona)
+
+
+class QuitarAdministradorView(APIView):
+    """Retira el permiso de administrador de plataforma."""
+
+    @extend_schema(responses={200: AdministradorFichaSerializer}, tags=["Configuración"])
+    def post(self, request: Request, user_id: int) -> Response:
+        """Quita el nombramiento; la cuenta vuelve a espera si no tiene finca."""
+        persona = platform_admin.quitar_administrador(
+            actor=request.user,
+            user_id=user_id,
+        )
+        return Response(persona)

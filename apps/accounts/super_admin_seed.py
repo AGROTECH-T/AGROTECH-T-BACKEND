@@ -88,11 +88,11 @@ def seed_usuario(
     nombre = _validar(lambda value: normalize_name(value, "nombre"), first_name)
     apellido = _validar(lambda value: normalize_name(value, "apellido"), last_name)
     celular = _validar(normalize_phone, phone) if phone.strip() else ""
-    clave = _clave(password)
 
     with transaction.atomic():
         user = User.objects.filter(identification=documento).first()
         if user is None:
+            clave = _clave(password)
             if clave is None:
                 raise SeedSuperAdminError("la contraseña es obligatoria para crear la cuenta")
             return User.objects.create(
@@ -110,8 +110,6 @@ def seed_usuario(
         user.correo = correo.strip() or user.correo
         if celular:
             user.phone = celular
-        if clave is not None:
-            user.password_hash = make_password(clave)
         user.is_active = True
         user.is_superadmin = is_superadmin
         user.is_administrador = is_administrador

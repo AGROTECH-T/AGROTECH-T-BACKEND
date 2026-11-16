@@ -54,6 +54,7 @@ class Session(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True)
     last_seen = models.DateTimeField()
     token_hash = models.CharField(max_length=64, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         db_table = "sessions"

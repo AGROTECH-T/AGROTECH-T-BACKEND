@@ -8,11 +8,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.inventario.api.movements.query import optional_date, positive_int
+from apps.inventario.api.movements.query import optional_date
 from apps.inventario.api.movements.serializers import (
     MovementCreateSerializer,
     MovementResponseSerializer,
 )
+from apps.inventario.api.paging import page_body, paginate
 from apps.inventario.services import movements as movement_services
 
 
@@ -29,7 +30,15 @@ class MovementListCreateView(APIView):
             farm_id=farm_id,
             product_id=product_id,
         )
-        return Response(MovementResponseSerializer(movements, many=True).data)
+        page, page_size, total, items = paginate(movements, request)
+        return Response(
+            page_body(
+                MovementResponseSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
+        )
 
     @extend_schema(
         tags=["inventario"],
@@ -59,13 +68,6 @@ class FarmMovementListView(APIView):
         responses={200: MovementResponseSerializer(many=True)},
     )
     def get(self, request: Request, farm_id: int) -> Response:
-        page = positive_int(request.query_params.get("page"), "página", default=1)
-        page_size = positive_int(
-            request.query_params.get("page_size"),
-            "tamaño de página",
-            default=20,
-            limit=100,
-        )
         movements = movement_services.list_farm_movements(
             user=request.user,
             farm_id=farm_id,
@@ -73,14 +75,12 @@ class FarmMovementListView(APIView):
             date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
             date_to=optional_date(request.query_params.get("to"), "la fecha final"),
         )
-        total = movements.count()
-        start = (page - 1) * page_size
-        page_items = movements[start : start + page_size]
+        page, page_size, total, items = paginate(movements, request)
         return Response(
-            {
-                "count": total,
-                "page": page,
-                "page_size": page_size,
-                "results": MovementResponseSerializer(page_items, many=True).data,
-            }
+            page_body(
+                MovementResponseSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
         )

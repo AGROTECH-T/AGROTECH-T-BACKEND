@@ -102,6 +102,9 @@ def test_reporte_de_consumo_suma_salidas(user):
     data = report_services.consumption_report(user=user, farm_id=farm_id)
     assert data["rows"][0]["product"] == "Semilla"
     assert data["rows"][0]["moves"] == 1
+    assert data["frequency"] == [
+        {"product_id": product.id, "product": "Semilla", "moves": 1}
+    ]
 
 
 @pytest.mark.django_db

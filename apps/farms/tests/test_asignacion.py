@@ -48,6 +48,25 @@ def test_administrador_ve_solo_sus_fincas(make_user, login):
 
 
 @pytest.mark.django_db
+def test_listado_trae_los_permisos_de_cada_persona(make_user, login):
+    """El filtro por permiso usa lo que el rol concede y lo extra."""
+    admin = make_user("10000004", first_name="Rita", last_name="Admin")
+    persona = make_user("10000005", first_name="Pablo", last_name="Campo")
+    finca = _finca("El mirador")
+    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
+    membresia = _miembro(finca, persona, FarmRole.CONSULTA)
+    membresia.extra_permissions.create(permission="ajustar_stock")
+
+    data = login(admin).get(LISTA).json()
+    ficha = next(item for item in data["usuarios"] if item["id"] == persona.id)
+    permisos = ficha["membresias"][0]["permisos"]
+
+    assert "ver_inventario" in permisos
+    assert "ajustar_stock" in permisos
+    assert "gestionar_productos" not in permisos
+
+
+@pytest.mark.django_db
 def test_operador_no_asigna(make_user, login):
     """Quien no administra ninguna finca no recibe personas."""
     operador = make_user("10000011", first_name="Olga", last_name="Campo")

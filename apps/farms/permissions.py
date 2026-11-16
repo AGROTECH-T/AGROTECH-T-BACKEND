@@ -74,7 +74,7 @@ NOMBRES_PERMISO = {permiso["id"]: permiso["nombre"] for permiso in PERMISOS_OPS}
 
 def permisos_directos(membership: FarmMembership) -> set[str]:
     """Códigos guardados como permiso extra de la membresía."""
-    return set(membership.extra_permissions.values_list("permission", flat=True))
+    return {extra.permission for extra in membership.extra_permissions.all()}
 
 
 def permisos_efectivos(membership: FarmMembership) -> set[str]:

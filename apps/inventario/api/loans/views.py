@@ -9,6 +9,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventario.api.paging import page_body, paginate
 from apps.inventario.api.products.serializers import ProductResponseSerializer
 from apps.inventario.catalog import plain_amount
 from apps.inventario.services import loans as loan_services
@@ -55,7 +56,15 @@ class ProductLoanListCreateView(APIView):
             farm_id=farm_id,
             product_id=product_id,
         )
-        return Response(LoanSerializer(rows, many=True).data)
+        page, page_size, total, items = paginate(rows, request)
+        return Response(
+            page_body(
+                LoanSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
+        )
 
     @extend_schema(tags=["inventario"], request=LoanCreateSerializer)
     def post(self, request: Request, farm_id: int, product_id: int) -> Response:

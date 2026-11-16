@@ -8,7 +8,7 @@ que ya está en los movimientos, sin guardar cifras aparte.
 from datetime import date, timedelta
 from decimal import Decimal
 
-from django.db.models import F, Sum
+from django.db.models import Count, F, Sum
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
@@ -217,6 +217,13 @@ def consumption_report(
             product_id=product_id,
         ),
         "flow": _flow(
+            farm_id=farm_id,
+            date_from=date_from,
+            date_to=date_to,
+            category_code=category_code,
+            product_id=product_id,
+        ),
+        "frequency": _frequency(
             farm_id=farm_id,
             date_from=date_from,
             date_to=date_to,
@@ -459,6 +466,40 @@ def _flow(
         if len(rows) > 370:
             break
     return rows
+
+
+def _frequency(
+    *,
+    farm_id: int,
+    date_from: date | None,
+    date_to: date | None,
+    category_code: str | None,
+    product_id: int | None,
+) -> list[dict]:
+    """Cuenta las salidas por insumo para ver cuáles se usan más seguido."""
+    queryset = Movement.objects.filter(
+        product__farm_id=farm_id,
+        kind=MovementKind.SALIDA,
+    )
+    queryset = _in_range(queryset, date_from, date_to)
+    if category_code:
+        queryset = queryset.filter(product__category__code=category_code)
+    if product_id is not None:
+        queryset = queryset.filter(product_id=product_id)
+
+    totals = (
+        queryset.values("product_id", "product__name")
+        .annotate(moves=Count("id"))
+        .order_by("-moves", "product__name")
+    )
+    return [
+        {
+            "product_id": row["product_id"],
+            "product": row["product__name"],
+            "moves": row["moves"],
+        }
+        for row in totals
+    ]
 
 
 def _consumption_query(
