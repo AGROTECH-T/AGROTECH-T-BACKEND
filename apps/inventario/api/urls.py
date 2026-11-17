@@ -21,8 +21,10 @@ from apps.inventario.api.movements.list_create_view import (
 from apps.inventario.api.products.detail_view import ProductDetailView
 from apps.inventario.api.products.history_view import ProductHistoryFileView
 from apps.inventario.api.products.image_view import ProductImageView
+from apps.inventario.api.products.import_view import ProductImportView
 from apps.inventario.api.products.inventory_view import ProductInventoryFileView
 from apps.inventario.api.products.list_create_view import ProductListCreateView
+from apps.inventario.api.products.template_view import ProductTemplateFileView
 from apps.inventario.api.reports.files import (
     AdjustmentReportFileView,
     ConsumptionReportFileView,
@@ -82,6 +84,16 @@ urlpatterns = [
         "inventory/<int:farm_id>/products/inventory.xlsx",
         ProductInventoryFileView.as_view(),
         name="product-inventory-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/products/template.xlsx",
+        ProductTemplateFileView.as_view(),
+        name="product-template-file",
+    ),
+    path(
+        "inventory/<int:farm_id>/products/import/",
+        ProductImportView.as_view(),
+        name="product-import",
     ),
     path(
         "inventory/<int:farm_id>/products/<int:product_id>/",

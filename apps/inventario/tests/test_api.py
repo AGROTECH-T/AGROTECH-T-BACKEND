@@ -186,6 +186,29 @@ def test_inventario_en_excel(login, user, farm, product):
 
 
 @pytest.mark.django_db
+def test_plantilla_vacia_sin_productos(login, user, farm, product):
+    """La plantilla solo trae encabezados, aunque la finca ya tenga productos."""
+    from apps.inventario.services.xlsx_reader import read_rows
+
+    client = login(user)
+    response = client.get(f"{_root(farm)}/products/template.xlsx")
+    assert response.status_code == 200
+    assert response.content[:2] == b"PK"
+    rows = read_rows(response.content)
+    assert len(rows) == 1
+    assert rows[0] == [
+        "Producto",
+        "Código",
+        "Categoría",
+        "Unidad",
+        "Stock actual",
+        "Equivalencia",
+        "Stock mínimo",
+    ]
+    assert all(product.name not in cell for cell in rows[0])
+
+
+@pytest.mark.django_db
 def test_movimientos_entrada_salida_e_historial(login, user, farm, product):
     """Se registra entrada y salida, y el historial se filtra por tipo y fecha."""
     client = login(user)
