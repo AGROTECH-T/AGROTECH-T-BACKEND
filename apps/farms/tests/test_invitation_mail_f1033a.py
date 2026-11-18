@@ -167,7 +167,9 @@ def test_mail_has_no_link_token_hash_or_foreign_data(admin, farm_id, mailbox, fi
     message = mailbox.messages[0]
     for body in (message["text"], message["html"]):
         lowered = body.lower()
-        assert "http" not in lowered and "href" not in lowered
+        # Solo se admite el xmlns del SVG de marca; no enlaces de aceptación.
+        without_svg_ns = lowered.replace('xmlns="http://www.w3.org/2000/svg"', "")
+        assert "http" not in without_svg_ns and "href" not in without_svg_ns
         assert "/invitations/accept" not in lowered and "#token" not in lowered
         assert fixed_token not in body
         assert invitation.token_hash not in body
