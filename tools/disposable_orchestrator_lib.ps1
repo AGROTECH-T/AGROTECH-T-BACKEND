@@ -2034,7 +2034,9 @@ function Test-ComposeRenderedConfig {
     if ($ports.Count -ne 1) { return "se esperaba exactamente una publicación de puerto" }
     $port = $ports[0]
     $renderedHostPort = [string](Get-JsonValue -Object $port -Path @("published"))
-    if ($renderedHostPort -in @("3306", "3307", "3317")) {
+    # 3317 es el puerto propio del perfil principal; la igualdad con
+    # $Ctx.HostPort (abajo) ya impide que otro perfil lo use.
+    if ($renderedHostPort -in @("3306", "3307")) {
         return "puerto de host desautorizado en la configuración renderizada: $renderedHostPort"
     }
     if ([string](Get-JsonValue -Object $port -Path @("host_ip")) -cne "127.0.0.1" -or $renderedHostPort -cne [string]$Ctx.HostPort -or [string](Get-JsonValue -Object $port -Path @("target")) -cne "3306") {

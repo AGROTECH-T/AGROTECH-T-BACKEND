@@ -13,7 +13,9 @@ from apps.farms.services import create_farm, deactivate_farm
 from apps.inventario import services
 from apps.inventario.models import Movement, MovementKind, Product
 
-pytestmark = pytest.mark.django_db(transaction=True)
+# serialized_rollback: el vaciado entre pruebas transaccionales borra las
+# categorías y unidades sembradas por migración; así se restauran.
+pytestmark = pytest.mark.django_db(transaction=True, serialized_rollback=True)
 
 
 def _delay_writer_after_membership_check(monkeypatch):

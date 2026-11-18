@@ -728,7 +728,9 @@ def test_preview_racing_accept(admin, farm_id, guest, mailbox):
         lambda: invitation_services.accept_invitation_code(user=guest, code=code),
     )
     assert isinstance(accepted, FarmMembership)
-    assert isinstance(preview, dict) or preview.status_code == 404
+    # Si la aceptación gana la carrera, la vista previa ve al invitado ya
+    # como miembro (409) o el código consumido (404); ambos son correctos.
+    assert isinstance(preview, dict) or preview.status_code in (404, 409)
     assert FarmMembership.objects.filter(farm_id=farm_id, user=guest).count() == 1
 
 
