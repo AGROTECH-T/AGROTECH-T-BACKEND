@@ -167,7 +167,7 @@ def test_capabilities_match_services(request, farm_id, devices, role_fixture):
 
 
 def test_manage_roles_have_single_source():
-    assert access.IOT_MANAGE_ROLES is IOT_MANAGE_ROLES
+    # INT-02: IoT autoriza por GESTIONAR_IOT; los roles se derivan de la matriz.
     assert frozenset({FarmRole.ADMINISTRADOR}) == IOT_MANAGE_ROLES
 
 

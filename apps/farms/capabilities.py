@@ -111,12 +111,9 @@ def can_create_first_farm(user: User) -> bool:
     Solo aplica a cuentas activas y verificadas que aún no tienen la capacidad
     global; consultarla no concede nada.
     """
-    return bool(
-        user.is_active
-        and user.email_verified
-        and not can_create_farms(user)
-        and first_farm_available(user)
-    )
+    # INT-02b: la excepción de primera finca queda desactivada; solo el
+    # superadmin habilita la creación nombrando administradores.
+    return False
 
 
 def can_open_inactive_farms(user: User) -> bool:

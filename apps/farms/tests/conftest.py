@@ -51,13 +51,13 @@ def make_user(db):
             phone=kwargs.pop("phone", "3001234567"),
             correo=kwargs.pop("correo", f"{identification}@example.com"),
             password_hash=make_password(VALID_PASSWORD),
-            # Las fixtures crean fincas libremente; las pruebas de F6 piden
-            # can_create_farms=False de forma explícita.
-            can_create_farms=kwargs.pop("can_create_farms", True),
+            # INT-02b: crear fincas exige ser administrador nombrado; quien pide
+            # can_create_farms=False queda como cuenta registrada sin permiso.
+            can_create_farms=(puede := kwargs.pop("can_create_farms", True)),
             # F10.2: crear fincas exige correo verificado en el servicio.
             email_verified=kwargs.pop("email_verified", True),
             # INT-02: rol de plataforma solo si la prueba lo pide.
-            is_administrador=kwargs.pop("is_administrador", False),
+            is_administrador=kwargs.pop("is_administrador", puede),
             **kwargs,
         )
 

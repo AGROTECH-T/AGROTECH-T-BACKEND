@@ -91,7 +91,9 @@ def test_superadmin_ve_todos_los_modulos(superadmin):
 def test_administrador_ve_todos_los_modulos(user):
     """El administrador nombrado opera fincas, inventario, galpón y roles."""
     user.is_administrador = True
-    user.save(update_fields=["is_administrador"])
+    # INT-02b: el administrador nombrado crea fincas con el correo verificado.
+    user.email_verified = True
+    user.save(update_fields=["is_administrador", "email_verified"])
     assert modulos_visibles(user) == MODULOS_COMPLETOS
     assert puede_crear_finca(user) is True
 
@@ -101,7 +103,7 @@ def test_trabajador_ve_modulos_de_finca(user):
     """Un trabajador creado por el administrador entra a su finca."""
     farm = Farm.objects.create(name="El Roble")
     FarmMembership.objects.create(farm=farm, user=user, role=FarmRole.OPERADOR)
-    assert modulos_visibles(user) == ["home", "fincas", "inventario", "galpon"]
+    assert modulos_visibles(user) == ["home", "fincas", "inventario", "galpon", "iot"]
 
 
 @pytest.mark.django_db
