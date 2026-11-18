@@ -22,17 +22,16 @@ def puede_crear_finca(user: User) -> bool:
     """Regla única para crear fincas (INT-02).
 
     Puede crear fincas una cuenta activa que sea superadmin, o administrador
-    de plataforma nombrado por el superadmin con el correo verificado
-    (INT-02b). Una cuenta registrada no crea fincas hasta ser nombrada.
+    de plataforma nombrado por el superadmin (``is_administrador``). Ya no
+    exige correo verificado. Ser administrador de una finca (invitación o
+    asignación) no concede esta capacidad.
 
     @param user Cuenta autenticada.
     @returns True si puede crear fincas.
     """
     if not user.is_active:
         return False
-    if user.is_superadmin:
-        return True
-    return bool(user.is_administrador and user.email_verified)
+    return bool(user.is_superadmin or user.is_administrador)
 
 
 def modulos_visibles(user: User) -> list[str]:

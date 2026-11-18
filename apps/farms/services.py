@@ -20,7 +20,6 @@ from apps.trazabilidad.models import AuditEvent, EventType
 from apps.trazabilidad.services import record_audit_event
 
 FARM_CREATION_FORBIDDEN = "tu cuenta no tiene permiso para crear fincas"
-FARM_CREATION_EMAIL_UNVERIFIED = "verifica tu correo para crear fincas"
 FIRST_FARM_REASON = "primera finca creada desde el onboarding"
 FIRST_FARM_SOURCE = "first_farm_onboarding"
 # Ventana en la que una solicitud idéntica a la de la primera finca se trata
@@ -83,11 +82,10 @@ def _clear_membership_permissions(*, membership: FarmMembership, actor, cause: s
 def create_farm(*, user: User, name: str) -> FarmMembership:
     """Crea una finca y la membresía administradora en una sola transacción.
 
-    Exige cuenta activa y correo verificado. Con la capacidad global
-    ``can_create_farms`` (DEC-11) crea sin más; sin ella, solo si la cuenta
-    conserva la excepción de primera finca (F10.2), y en ese caso concede la
-    capacidad dentro de la misma transacción. Ser administrador de otra finca
-    no basta.
+    Exige cuenta activa con capacidad global de crear fincas (superadmin o
+    administrador de plataforma nombrado por el superadmin). Ya no exige
+    correo verificado. Ser administrador de otra finca (invitación o
+    asignación) no basta.
 
     La cuenta se bloquea primero, así que las solicitudes de una misma cuenta
     se serializan. Un reintento de la operación de onboarding (mismo nombre,
@@ -120,12 +118,9 @@ def create_farm(*, user: User, name: str) -> FarmMembership:
 
 
 def _require_creator(account: User) -> None:
-    """Exige cuenta activa y correo verificado (cuenta ya bloqueada)."""
+    """Exige cuenta activa (cuenta ya bloqueada)."""
     if not account.is_active:
         raise AppError(FARM_CREATION_FORBIDDEN, 403)
-    # INT-02b: solo el superadmin queda exento de verificar el correo.
-    if not account.email_verified and not account.is_superadmin:
-        raise AppError(FARM_CREATION_EMAIL_UNVERIFIED, 403)
 
 
 def _first_farm_replay(account: User, name: str) -> FarmMembership | None:

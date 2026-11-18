@@ -105,12 +105,11 @@ class FarmListCreateView(APIView):
             403: OpenApiResponse(
                 response=FarmErrorResponseSerializer,
                 description=(
-                    "La cuenta no tiene la capacidad global can_create_farms "
-                    "(DEC-11) ni conserva la excepción de primera finca (F10.2): "
-                    '{"error": "tu cuenta no tiene permiso para crear fincas"}; o el '
-                    'correo no está verificado: {"error": "verifica tu correo para '
-                    'crear fincas"}. '
-                    "Ser administrador de otra finca no la concede."
+                    "La cuenta no es superadmin ni administrador de plataforma "
+                    'nombrado por el superadmin: {"error": "tu cuenta no tiene '
+                    'permiso para crear fincas"}. '
+                    "Ser administrador de otra finca (invitación o asignación) "
+                    "no la concede."
                 ),
             ),
         },

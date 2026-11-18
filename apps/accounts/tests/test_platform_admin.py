@@ -91,8 +91,7 @@ def test_superadmin_ve_todos_los_modulos(superadmin):
 def test_administrador_ve_todos_los_modulos(user):
     """El administrador nombrado opera fincas, inventario, galpón y roles."""
     user.is_administrador = True
-    # INT-02b: el administrador nombrado crea fincas con el correo verificado.
-    user.email_verified = True
+    user.email_verified = False
     user.save(update_fields=["is_administrador", "email_verified"])
     assert modulos_visibles(user) == MODULOS_COMPLETOS
     assert puede_crear_finca(user) is True
