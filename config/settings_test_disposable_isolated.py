@@ -44,6 +44,9 @@ AUTHORIZED_MIGRATIONS = frozenset(
     {
         ("accounts", "0001_initial"),
         ("accounts", "0002_harden_sessions"),
+        # INT-02: migraciones de develop, anteriores a las de la rama IoT.
+        ("accounts", "0003_platform_roles"),
+        ("accounts", "0004_session_created_at"),
         (
             "accounts",
             "0005_logincode_id_logincode_purpose_user_email_verified_and_more",
@@ -55,6 +58,7 @@ AUTHORIZED_MIGRATIONS = frozenset(
         ("accounts", "0007_logincode_delivery_fields"),
         ("accounts", "0008_user_can_create_farms"),
         ("farms", "0001_initial"),
+        ("farms", "0002_farmpermission"),
         ("farms", "0003_farm_deactivation"),
         (
             "farms",

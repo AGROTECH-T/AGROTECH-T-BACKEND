@@ -28,6 +28,7 @@ EXPECTED_TABLES = frozenset(
         "sessions",
         "farms",
         "farm_memberships",
+        "farm_permissions",
         "farm_invitations",
         "audit_events",
         "django_migrations",
@@ -67,10 +68,13 @@ def _authorized_deps():
     return {
         ("accounts", "0001_initial"): (),
         ("accounts", "0002_harden_sessions"): (("accounts", "0001_initial"),),
+        # INT-02: migraciones de develop antes de las de la rama IoT.
+        ("accounts", "0003_platform_roles"): (("accounts", "0002_harden_sessions"),),
+        ("accounts", "0004_session_created_at"): (("accounts", "0003_platform_roles"),),
         (
             "accounts",
             "0005_logincode_id_logincode_purpose_user_email_verified_and_more",
-        ): (("accounts", "0002_harden_sessions"),),
+        ): (("accounts", "0004_session_created_at"),),
         (
             "accounts",
             "0006_session_closed_at_session_created_at_session_id_and_more",
@@ -90,8 +94,9 @@ def _authorized_deps():
             ("accounts", "0007_logincode_delivery_fields"),
         ),
         ("farms", "0001_initial"): (("accounts", "0002_harden_sessions"),),
+        ("farms", "0002_farmpermission"): (("farms", "0001_initial"),),
         ("farms", "0003_farm_deactivation"): (
-            ("farms", "0001_initial"),
+            ("farms", "0002_farmpermission"),
             ("accounts", "0002_harden_sessions"),
         ),
         ("farms", "0004_farmmembership_left_at_farmmembership_revoked_at_and_more"): (
@@ -176,7 +181,7 @@ def test_expected_constants(monkeypatch):
     ]
     assert not hasattr(module, "MIGRATION_MODULES")
     assert module.AUTHORIZED_APPS == frozenset({"accounts", "farms", "trazabilidad"})
-    assert len(module.AUTHORIZED_MIGRATIONS) == 24
+    assert len(module.AUTHORIZED_MIGRATIONS) == 27  # INT-02: +3 de develop
     assert module.AUTHORIZED_MIGRATIONS == frozenset(_authorized_deps())
     assert module.TERMINAL_MIGRATIONS == frozenset(
         {
