@@ -1,0 +1,8 @@
+# Normaliza finales de linea en el repositorio (INT-02).
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.png binary
+*.jpg binary
+*.ico binary
+*.pdf binary
