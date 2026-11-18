@@ -15,7 +15,7 @@ from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.accounts.services import session_service
 from apps.farms import permissions as farm_permissions
-from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole
+from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole, MembershipStatus
 
 
 def listar_personas(actor: User, search: str = "") -> dict:
@@ -140,7 +140,7 @@ def crear_persona(*, actor: User, datos: dict) -> dict:
 def _fincas_administradas(actor: User) -> list[int]:
     """Identificadores de fincas donde el actor es administrador."""
     return list(
-        FarmMembership.objects.filter(
+        _activas().filter(
             user=actor,
             role=FarmRole.ADMINISTRADOR,
         ).values_list("farm_id", flat=True)
@@ -149,7 +149,7 @@ def _fincas_administradas(actor: User) -> list[int]:
 
 def _es_administrador(actor: User, farm_id: int) -> bool:
     """Indica si el actor administra esa finca."""
-    return FarmMembership.objects.filter(
+    return _activas().filter(
         user=actor,
         farm_id=farm_id,
         role=FarmRole.ADMINISTRADOR,
@@ -165,7 +165,7 @@ def _exigir_finca_administrada(actor: User, farm_id: int) -> None:
 
 def _rechazar_finca(actor: User, farm_id: int) -> None:
     """Distingue entre finca ajena y finca propia sin permiso."""
-    pertenece = FarmMembership.objects.filter(user=actor, farm_id=farm_id).exists()
+    pertenece = _activas().filter(user=actor, farm_id=farm_id).exists()
     if pertenece:
         raise AppError("solo el administrador puede cambiar roles", 403)
     raise AppError("finca no encontrada", 404)
@@ -174,7 +174,7 @@ def _rechazar_finca(actor: User, farm_id: int) -> None:
 def _membresia(user_id: int, farm_id: int) -> FarmMembership:
     """Membresía de la persona en la finca o error 404."""
     membership = (
-        FarmMembership.objects.filter(user_id=user_id, farm_id=farm_id)
+        _activas().filter(user_id=user_id, farm_id=farm_id)
         .select_related("user", "farm")
         .first()
     )
@@ -200,7 +200,7 @@ def _conservar_administrador(membership: FarmMembership, role: str) -> None:
     if membership.role != FarmRole.ADMINISTRADOR or role == FarmRole.ADMINISTRADOR:
         return
     queda_otro = (
-        FarmMembership.objects.filter(
+        _activas().filter(
             farm_id=membership.farm_id,
             role=FarmRole.ADMINISTRADOR,
             user__is_active=True,
@@ -215,7 +215,7 @@ def _conservar_administrador(membership: FarmMembership, role: str) -> None:
 def _conservar_administrador_activo(person: User, farm_ids: list[int]) -> None:
     """No permite inactivar al último administrador activo de una finca."""
     for farm_id in farm_ids:
-        es_admin = FarmMembership.objects.filter(
+        es_admin = _activas().filter(
             user=person,
             farm_id=farm_id,
             role=FarmRole.ADMINISTRADOR,
@@ -223,7 +223,7 @@ def _conservar_administrador_activo(person: User, farm_ids: list[int]) -> None:
         if not es_admin:
             continue
         queda_otro = (
-            FarmMembership.objects.filter(
+            _activas().filter(
                 farm_id=farm_id,
                 role=FarmRole.ADMINISTRADOR,
                 user__is_active=True,
@@ -250,7 +250,7 @@ def _agrupar(
 ) -> list[dict]:
     """Arma una ficha por persona con sus membresías visibles."""
     consulta = (
-        FarmMembership.objects.filter(farm_id__in=farm_ids)
+        _activas().filter(farm_id__in=farm_ids)
         .select_related("user", "farm")
         .prefetch_related("extra_permissions")
     )
@@ -292,7 +292,7 @@ def _ficha_detalle(actor: User, person: User, farm_ids: list[int]) -> dict:
     """Ficha con el rol y los permisos de cada finca administrada."""
     ficha = _ficha(actor, person)
     for membership in (
-        FarmMembership.objects.filter(user=person, farm_id__in=farm_ids)
+        _activas().filter(user=person, farm_id__in=farm_ids)
         .select_related("farm")
         .order_by("farm_id")
     ):
@@ -331,3 +331,8 @@ def _describir(permisos: set[str]) -> list[dict]:
 _IDS_ASIGNABLES = {
     permiso["id"] for permiso in farm_permissions.PERMISOS_ASIGNABLES
 }
+
+
+def _activas():
+    """Membresías vigentes (INT-02): las revocadas o retiradas no cuentan."""
+    return FarmMembership.objects.filter(status=MembershipStatus.ACTIVE)

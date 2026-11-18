@@ -15,7 +15,7 @@ from django.utils import timezone
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.farms.capabilities import can_create_farms, first_farm_available
-from apps.farms.models import Farm, FarmMembership, FarmRole, MembershipStatus
+from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole, MembershipStatus
 from apps.trazabilidad.models import AuditEvent, EventType
 from apps.trazabilidad.services import record_audit_event
 
@@ -67,7 +67,12 @@ def _clear_membership_permissions(*, membership: FarmMembership, actor, cause: s
     Debe invocarse dentro de la transacción del llamador, después de bloquear
     ``Farm`` y la membresía y de completar las validaciones de negocio. La
     importación es diferida para no acoplar el arranque de Farms a Permissions.
+
+    INT-02: los permisos directos (``FarmPermission``, fuente única de permisos)
+    se borran siempre; una membresía revocada o retirada no conserva permisos.
+    ``apps.permissions`` queda en modo heredado hasta su retiro acordado.
     """
+    FarmPermission.objects.filter(membership=membership).delete()
     if not _permission_cleanup_enabled():
         return
     from apps.permissions.services import clear_membership_permissions

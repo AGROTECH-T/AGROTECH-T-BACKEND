@@ -5,8 +5,9 @@ reglas en cada operación.
 
 - Lectura: membresía activa en finca activa (``can_read_iot``).
 - Administración: bloqueo de ``Farm`` y de la membresía
-  (``lock_active_membership``), rol en ``IOT_MANAGE_ROLES`` (solo
-  administrador) con cuenta activa (``can_manage_iot``) y, después,
+  (``lock_active_membership``), permiso ``gestionar_iot`` (por rol
+  administrador o permiso directo, INT-02) con cuenta activa
+  (``can_manage_iot``) y, después,
   ``require_mariadb()``.
 
 Orden de una escritura IoT (IoT-02.2-R2):
@@ -25,8 +26,8 @@ bloqueos de dispositivos revalidan su estado.
 """
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
+from apps.farms import permissions as farm_permissions
 from apps.farms import services as farm_services
-from apps.farms.capabilities import IOT_MANAGE_ROLES
 from apps.farms.models import FarmMembership
 from apps.iot.db_guard import require_mariadb
 
@@ -45,7 +46,9 @@ def lock_manage_membership(*, user: User, farm_id: int) -> FarmMembership:
     datos de la operación.
     """
     membership = farm_services.lock_active_membership(user=user, farm_id=farm_id)
-    if membership.role not in IOT_MANAGE_ROLES or not user.is_active:
+    if not user.is_active or not farm_permissions.tiene_permiso(
+        membership, farm_permissions.GESTIONAR_IOT
+    ):
         raise AppError(IOT_MANAGE_FORBIDDEN, 403)
     require_mariadb()
     return membership
