@@ -97,8 +97,8 @@ def test_administrador_cambia_el_rol(make_user, login):
 
 
 @pytest.mark.django_db
-def test_admin_cambia_su_propio_rol(make_user, login):
-    """El administrador puede bajarse de rol si queda otro administrador."""
+def test_no_cambia_su_propio_rol(make_user, login):
+    """La sesión no puede modificarse a sí misma."""
     admin = make_user("10000031", first_name="Nora", last_name="Admin")
     apoyo = make_user("10000032", first_name="Ivo", last_name="Admin")
     finca = _finca("El lago")
@@ -111,28 +111,8 @@ def test_admin_cambia_su_propio_rol(make_user, login):
         format="json",
     )
 
-    assert response.status_code == 200
-    assert response.json()["membresias"][0]["role"] == FarmRole.CONSULTA
-    assert (
-        FarmMembership.objects.get(farm=finca, user=admin).role == FarmRole.CONSULTA
-    )
-
-
-@pytest.mark.django_db
-def test_admin_no_se_baja_si_es_el_unico(make_user, login):
-    """El último administrador no puede quitarse el rol."""
-    admin = make_user("10000033", first_name="Nora", last_name="Sola")
-    finca = _finca("Solo admin")
-    _miembro(finca, admin, FarmRole.ADMINISTRADOR)
-
-    response = login(admin).put(
-        _rol(admin.id),
-        {"farm_id": finca.id, "role": FarmRole.OPERADOR},
-        format="json",
-    )
-
-    assert response.status_code == 400
-    assert response.json()["error"] == "la finca debe conservar un administrador"
+    assert response.status_code == 403
+    assert response.json()["error"] == "no puedes cambiar tu propio rol"
 
 
 @pytest.mark.django_db
