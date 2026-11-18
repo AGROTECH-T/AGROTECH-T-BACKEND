@@ -12,7 +12,8 @@ from django.db import transaction
 from django.db.models import Q
 
 from apps.accounts.errors import AppError
-from apps.accounts.models import Session, User
+from apps.accounts.models import User
+from apps.accounts.services import session_service
 from apps.farms import permissions as farm_permissions
 from apps.farms.models import Farm, FarmMembership, FarmPermission, FarmRole
 
@@ -98,7 +99,8 @@ def cambiar_estado(*, actor: User, user_id: int, activo: bool) -> dict:
         raise AppError("la cuenta ya tiene ese estado", 400)
     if not activo:
         _conservar_administrador_activo(person, farm_ids)
-        Session.objects.filter(user=person).delete()
+        # INT-02: sesiones múltiples; se cierran y quedan en el historial.
+        session_service.revoke_all(person)
     person.is_active = activo
     person.save(update_fields=["is_active"])
     return _ficha_detalle(actor, person, farm_ids)

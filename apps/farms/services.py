@@ -14,7 +14,7 @@ from django.utils import timezone
 
 from apps.accounts.errors import AppError
 from apps.accounts.models import User
-from apps.farms.capabilities import first_farm_available
+from apps.farms.capabilities import can_create_farms, first_farm_available
 from apps.farms.models import Farm, FarmMembership, FarmRole, MembershipStatus
 from apps.trazabilidad.models import AuditEvent, EventType
 from apps.trazabilidad.services import record_audit_event
@@ -118,7 +118,8 @@ def _require_creator(account: User) -> None:
     """Exige cuenta activa y correo verificado (cuenta ya bloqueada)."""
     if not account.is_active:
         raise AppError(FARM_CREATION_FORBIDDEN, 403)
-    if not account.email_verified:
+    # Los roles de plataforma los crea el superadmin; no pasan por F10.2.
+    if not account.email_verified and not (account.is_superadmin or account.is_administrador):
         raise AppError(FARM_CREATION_EMAIL_UNVERIFIED, 403)
 
 
@@ -176,7 +177,7 @@ def _authorize_farm_creation(account: User) -> bool:
         True si se usa la excepción de primera finca; False si la cuenta ya
         tiene la capacidad global.
     """
-    if account.can_create_farms:
+    if can_create_farms(account):
         return False
     if first_farm_available(account):
         return True

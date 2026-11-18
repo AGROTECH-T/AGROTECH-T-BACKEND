@@ -10,6 +10,7 @@ aceptan desde el cliente.
 Los permisos granulares de apps.permissions no intervienen (decisión B3).
 """
 from apps.accounts.models import User
+from apps.accounts.services.access import puede_crear_finca
 from apps.farms.models import FarmMembership, FarmRole, MembershipStatus
 from apps.trazabilidad.models import AuditEvent, EventType
 
@@ -62,9 +63,10 @@ def farm_capabilities(membership: FarmMembership) -> dict[str, bool]:
 def can_create_farms(user: User) -> bool:
     """Capacidad global de crear fincas (no depende de ninguna membresía).
 
-    Exige cuenta activa y correo verificado además de la bandera (F10.2).
+    Delega en la regla única ``accounts.services.access.puede_crear_finca``
+    (INT-02): roles de plataforma o bandera con correo verificado.
     """
-    return bool(user.is_active and user.email_verified and user.can_create_farms)
+    return puede_crear_finca(user)
 
 
 def first_farm_available(user: User) -> bool:
@@ -101,7 +103,7 @@ def can_create_first_farm(user: User) -> bool:
     return bool(
         user.is_active
         and user.email_verified
-        and not user.can_create_farms
+        and not can_create_farms(user)
         and first_farm_available(user)
     )
 
