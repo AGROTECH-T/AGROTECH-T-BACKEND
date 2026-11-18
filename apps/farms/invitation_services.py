@@ -42,7 +42,6 @@ INVITATION_TTL_DAYS = 7
 INVITATION_NOT_FOUND = "invitación no encontrada"
 INVITATION_DELIVERY_FAILED = "no se pudo entregar la invitación"
 ALREADY_MEMBER = "ya perteneces a esta finca"
-EMAIL_NOT_VERIFIED = "verifica tu correo para aceptar invitaciones"
 MAX_PENDING_INVITATIONS = 50
 
 # F10.3.2: colisiones de code_hash. MariaDB informa una clave duplicada con el
@@ -133,11 +132,14 @@ def _accept_link(token: str) -> str:
     return build_accept_link(base, token)
 
 
-def _verified_accounts(normalized_email: str):
-    """Retorna las cuentas verificadas cuyo correo normalizado coincide."""
+def _accounts_with_email(normalized_email: str):
+    """Retorna las cuentas cuyo correo normalizado coincide.
+
+    Ya no exige ``email_verified``: la verificación de correo al inicio se
+    retiró; la invitación se ata al correo de la cuenta autenticada.
+    """
     return (
-        User.objects.filter(email_verified=True)
-        .annotate(normalized=Lower(Trim("correo")))
+        User.objects.annotate(normalized=Lower(Trim("correo")))
         .filter(normalized=normalized_email)
     )
 
@@ -663,9 +665,9 @@ def _accept_pending(
             raise AppError(INVITATION_NOT_FOUND, 404)
 
         normalized = _normalize_email(invitation.email)
-        if _normalize_email(user.correo) != normalized or not user.email_verified:
+        if _normalize_email(user.correo) != normalized:
             raise AppError(INVITATION_NOT_FOUND, 404)
-        matches = _verified_accounts(normalized)
+        matches = _accounts_with_email(normalized)
         if matches.count() != 1 or matches.first().pk != user.pk:
             raise AppError(INVITATION_NOT_FOUND, 404)
 
@@ -748,15 +750,13 @@ def _accept_pending(
 
 
 def ensure_code_eligible(user: User) -> None:
-    """Exige una cuenta activa con el correo verificado (403 en otro caso).
+    """Exige una cuenta activa (403 si está inactiva).
 
     Se comprueba antes de mirar el código, así que no cuenta como intento
-    fallido.
+    fallido. Ya no exige correo verificado.
     """
     if not user.is_active:
         raise AppError("la cuenta no está activa", 403)
-    if not user.email_verified:
-        raise AppError(EMAIL_NOT_VERIFIED, 403)
 
 
 @sensitive_variables("code")
@@ -767,7 +767,7 @@ def _code_credential(user: User, code) -> str:
     encontrar invitaciones dirigidas a ese correo.
 
     Raises:
-        AppError 403: cuenta inactiva o correo sin verificar.
+        AppError 403: cuenta inactiva.
         AppError 404: código mal formado o cuenta sin correo (genérico).
     """
     ensure_code_eligible(user)
@@ -805,7 +805,7 @@ def preview_invitation_code(*, user: User, code) -> dict:
     )
     if not valid:
         raise AppError(INVITATION_NOT_FOUND, 404)
-    matches = _verified_accounts(normalized)
+    matches = _accounts_with_email(normalized)
     if matches.count() != 1 or matches.first().pk != user.pk:
         raise AppError(INVITATION_NOT_FOUND, 404)
     if FarmMembership.objects.filter(

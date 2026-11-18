@@ -412,14 +412,15 @@ def test_accept_reused_token_404(make_user):
     assert exc.value.status_code == 404
 
 
-def test_accept_unverified_email_404(make_user):
+def test_accept_unverified_email_creates_membership(make_user):
     admin = make_user("11111111")
     farm_id = _farm(admin)
     invited = make_user("22222222", correo="invited@example.com", email_verified=False)
-    _invite(farm_id, "invited@example.com", token="tok")
-    with pytest.raises(AppError) as exc:
-        invitation_services.accept_invitation(user=invited, token="tok")
-    assert exc.value.status_code == 404
+    _invite(farm_id, "invited@example.com", token="tok", admin=admin)
+    membership = invitation_services.accept_invitation(user=invited, token="tok")
+    assert membership.farm_id == farm_id
+    assert membership.status == MembershipStatus.ACTIVE
+    assert FarmMembership.objects.filter(user=invited, farm_id=farm_id).exists()
 
 
 def test_accept_ambiguous_identity_404(make_user):

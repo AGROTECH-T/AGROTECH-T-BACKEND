@@ -193,12 +193,12 @@ def test_missing_or_empty_code_is_a_contract_error(guest):
     assert code_attempts.failed_attempts(guest.pk) == 0
 
 
-def test_preview_unverified_email_is_403_and_not_counted(admin, farm_id, make_user, mailbox):
+def test_preview_unverified_email_is_allowed(admin, farm_id, make_user, mailbox):
     _invitation, code = _invite(admin, farm_id, mailbox)
     unverified = make_user("84000004", correo=GUEST, email_verified=False)
     response = _post(_client(unverified), PREVIEW, code)
-    assert response.status_code == 403
-    assert response.data == {"error": invitation_services.EMAIL_NOT_VERIFIED}
+    assert response.status_code == 200
+    assert response.data["farm_name"]
     assert code_attempts.failed_attempts(unverified.pk) == 0
 
 
@@ -325,12 +325,14 @@ def test_accept_rejections_are_generic(admin, farm_id, guest, make_user, mailbox
     assert not FarmMembership.objects.filter(farm_id=farm_id).exclude(user=admin).exists()
 
 
-def test_accept_unverified_email_is_403(admin, farm_id, make_user, mailbox):
+def test_accept_unverified_email_creates_membership(admin, farm_id, make_user, mailbox):
     _invitation, code = _invite(admin, farm_id, mailbox)
     unverified = make_user("84000006", correo=GUEST, email_verified=False)
     response = _post(_client(unverified), ACCEPT, code)
-    assert response.status_code == 403
-    assert not FarmMembership.objects.filter(user=unverified).exists()
+    assert response.status_code == 200
+    assert FarmMembership.objects.filter(
+        user=unverified, farm_id=farm_id, status=MembershipStatus.ACTIVE
+    ).exists()
 
 
 def test_accept_reactivates_membership_and_clears_permissions(
