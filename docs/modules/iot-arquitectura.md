@@ -1,7 +1,7 @@
 # IoT-01 — Arquitectura general del sistema IoT
 
 - **Etapa:** IoT-01 (solo documentación)
-- **Estado de implementación:** Diseñada. No existe código IoT: `apps/iot/` es un esqueleto.
+- **Estado de implementación:** Parcial. Hay modelos y servicios IoT, parser Frame v1, consumidor MQTT, persistencia transaccional y API REST en el repositorio. Su funcionamiento conectado a MariaDB y Mosquitto no se verificó en este BUILD.
 - **Decisión asociada:** [DEC-13](../decisions/DEC-13-arquitectura-iot.md)
 - **Fecha:** 2026-11-12
 - **Documentos relacionados:**
@@ -49,6 +49,13 @@ React (web) ◀──REST/HTTPS── Django API ◀── MariaDB ◀── Con
                                                      (proceso aparte)  (QoS 1)
 ```
 
+El consumidor MQTT es un comando de Django y delega en
+`apps/iot/services/ingestion.py`. Ese servicio es el único responsable de las
+escrituras de ingesta IoT en MariaDB y conserva la transacción atómica existente.
+No hay un Writer independiente ni transporte Django → Writer implementados.
+`apps/iot/ingestion_identity.py` aporta identidad y huella al servicio de ingesta
+existente; esta integración local no representa un servicio Writer.
+
 ### 3.2 Responsabilidades
 
 | Componente | Hace | No hace |
@@ -56,7 +63,8 @@ React (web) ◀──REST/HTTPS── Django API ◀── MariaDB ◀── Con
 | Coordinador | Lee sensores, numera tramas (arranque + secuencia), firma con su clave HMAC, transmite por LoRa. | No conoce la finca ni el broker. No usa Wi-Fi. |
 | Gateway | Recibe tramas, las guarda en un búfer si no hay Wi-Fi, las publica **sin modificarlas** en su topic MQTT, agrega metadatos de radio y de hora de recepción. | No interpreta las lecturas. No verifica la firma (ver [seguridad](iot-seguridad.md) §P-IOT-07). No decide la finca. |
 | Mosquitto | Autentica a cada gateway, aplica ACL por topic, conserva mensajes QoS 1 para el consumidor. | No valida contenido de negocio. |
-| Consumidor Django | Valida, verifica HMAC, resuelve finca, deduplica, persiste en una transacción y confirma al broker. | No atiende HTTP. No corre dentro de gunicorn. |
+| Consumidor MQTT Django | Valida topic y payload, delega en el servicio de ingesta y confirma al broker tras un resultado terminal. | No escribe directamente ni contiene lógica de dominio. |
+| Servicio de ingesta Django | Valida Frame v1 y HMAC, resuelve autorizaciones, finca, credenciales y sensores; deduplica y persiste trama y mediciones en la transacción existente. | No crea una ruta alternativa de escritura. |
 | MariaDB | Única base de datos del módulo IoT. | — |
 | API REST Django | Expone dispositivos, sensores e historial con la autenticación y membresías existentes. | No recibe telemetría de dispositivos. |
 | React | Consulta la API REST como aplicación web. | **No usa MQTT** ni se conecta al broker. |
@@ -74,6 +82,13 @@ React (web) ◀──REST/HTTPS── Django API ◀── MariaDB ◀── Con
    controladas por la plataforma.
 
 ### 3.4 Integración con el backend existente
+
+La arquitectura vigente es Django → MariaDB: no usa Writer separado ni mTLS
+entre Django y otro servicio. La ingesta deriva UUIDv5 y SHA-256 después de
+resolver y autenticar la identidad LoRa, y usa la huella para comparar una
+reentrega con los campos semánticos de una trama aceptada. La huella no se
+persiste; los resultados terminales de rechazo tampoco se conservan de forma
+durable.
 
 - Dominio: `apps/iot/` (ya registrado en `INSTALLED_APPS`, `config/settings.py`).
 - Aislamiento por finca: toda entidad IoT raíz tendrá FK a `farms.Farm`,
@@ -93,11 +108,11 @@ React (web) ◀──REST/HTTPS── Django API ◀── MariaDB ◀── Con
 
 | Entidad | Identificador | Origen |
 |---|---|---|
-| Gateway | `gateway_uid` | Lo genera el backend al registrar el gateway; también es su usuario MQTT. |
+| Gateway | `gateway_uid` | Lo genera el backend al registrar el gateway; también es su usuario MQTT. Su credencial (`gws_…`, solo la huella en el backend) se describe en [credenciales de gateway](iot-credenciales-gateway.md). |
 | Coordinador | `coordinator_uid` | Lo genera el backend al registrar el coordinador; viaja dentro de la trama firmada. |
 | Sensor | (`coordinator_uid`, `canal`) | Canal local del coordinador; el backend lo asocia a un sensor registrado. |
 | Arranque | `boot_counter` | Contador persistente del coordinador, sube en cada reinicio. |
-| Trama | (`coordinator_uid`, `boot_counter`, `seq`) | Identidad única de cada trama; base de la deduplicación. |
+| Trama | (`coordinator_id`, `credential_id`, `boot_counter`, `seq`) | Identidad persistente usada por la deduplicación; reemplazó la identidad inicial por UID. |
 
 La MAC del ESP32 **no** se usa como identidad: puede falsificarse y cambia si se
 reemplaza la placa. Puede registrarse como dato informativo. Formato definido en

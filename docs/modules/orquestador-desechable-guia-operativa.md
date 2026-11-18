@@ -25,13 +25,13 @@ Versión del código descrita (SHA-256):
 
 | Archivo | SHA-256 |
 |---|---|
-| `tools/run_permissions_disposable.ps1` | `73B8D6FC858E48B990327E6CCE87A6DBD9DE25797AA50265F4B058CF007F77F6` (F10.3.4-A: `-WithRedis` y `-RedisImageDigest`) |
-| `tools/disposable_orchestrator_lib.ps1` | `4DB9E423451B066612C9F711E313B813CDCC34DF12E76ADE28D94DFE81365EBE` (F10.3.4-A: Redis opcional; sin `-WithRedis`, sin cambios de comportamiento) |
+| `tools/run_permissions_disposable.ps1` | `6ECC3A1AD12F0B52E5360B87DF226CD82DCFB55A66D866138E833078C122B9C9` (VALIDATION-02: `-CoverageIot`; antes F10.3.4-A: `-WithRedis` y `-RedisImageDigest`) |
+| `tools/disposable_orchestrator_lib.ps1` | `2CF85E2D21FA5C3D82B2953AB87EC7A3A5A8C0041F1FCA5B1FE99914C2607ACC` (VALIDATION-02: `-CoverageIot`, sin cambios de comportamiento si no se usa; antes F10.3.4-A: Redis opcional; sin `-WithRedis`, sin cambios de comportamiento) |
 | `docker-compose.disposable.yml` | `24FD0F71F2A81B7407C971EB108C694998AABD585A09C2F2CBFB9817EC3F4382` |
 | `docker-compose.disposable.redis.yml` | `0D48D7E851C429939E36746845822E6AA3182F666581767274DCCBADCFA847C0` (F10.3.4-A, solo con `-WithRedis`) |
-| `config/disposable_preflight.py` | `AF200113B9D14337347B1FF48A67E07DA18AFF8172FC940788BC0BFB45238A3B` (F10.3.4-A: comprobación `redis`) |
+| `config/disposable_preflight.py` | `6274A1481677B91B889838127BEBEE56EC18403E1828FA39E8C7C7B21EEA60A3` (diagnóstico iot.0011: traceback redactado en `operation`) |
 | `config/settings_test_disposable.py` | `521E8BC67CB4488EEFA53666F8E4B251B89936FD4D5A00450A5644958B977538` (F10.3.4-A: caché Redis desechable opcional) |
-| `config/settings_test_disposable_isolated.py` | `BABC567C8944666A97755929CCA748683313E3E2F201404D2994827CCDF1E53A` (BUILD IoT-02.2: añade `trazabilidad.0009` al grafo autorizado y como nodo terminal; antes BUILD F6 con `accounts.0006` y `trazabilidad.0008`) |
+| `config/settings_test_disposable_isolated.py` | `A1B846C92B9B45BAFCA9EEC1271B53EC74D5D45D6E0186C4ADF4E3733903DE44` (BUILD IoT-03.2: añade `trazabilidad.0011` al grafo autorizado y como nodo terminal; antes IoT-03.1 con `0010`, IoT-02.2 con `0009` y BUILD F6 con `accounts.0006` y `trazabilidad.0008`) |
 | `conftest.py` | `6F0EE04FE174717A79EB75C9084AE52C1DF4528A5B0CEA747A71AD562A81FD42` |
 
 Si alguno de estos archivos cambia, hay que revisar esta guía.
@@ -104,6 +104,7 @@ Aclaraciones:
 | `-PreflightTimeoutSeconds` | Preflight. | Entero de 30 a 1800. | 300 |
 | `-MigrateTimeoutSeconds` | migrate y sqlmigrate. | Entero de 30 a 3600. | 900 |
 | `-PytestTimeoutSeconds` | pytest. | Entero de 60 a 14400. | 3600 |
+| `-CoverageIot` | Cobertura de `apps/iot` con ramas (pytest-cov); informes en `OutputDirectory`. Ver `docs/modules/iot-validacion-02.md`. | Solo con `-Validate`. No altera preflight, guardas, base ni rutas. | desactivado |
 | `-CleanupTimeoutSeconds` | Plazo global de limpieza. | Entero de 30 a 900. | 180 |
 
 Los timeouts se admiten en todos los modos, también con `-CleanupOnly`. Cualquier

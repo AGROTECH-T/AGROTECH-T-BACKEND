@@ -10,14 +10,25 @@
 Definir cómo se autentica cada componente, cómo se gestionan las claves y cómo
 se garantiza que ningún mensaje pueda asignarse por sí mismo a una finca.
 
+### Arquitectura vigente de ingesta
+
+Django valida y procesa la ingesta; `apps/iot/services/ingestion.py` es el
+único responsable de escribirla en MariaDB. El consumidor MQTT delega en ese
+servicio. No hay Writer independiente ni autenticación mTLS Django → Writer.
+El principal `django-iot-ingestion` se fija dentro del servicio Django tras
+validar gateway, coordinador y HMAC; nunca se toma del payload. UUIDv5 y SHA-256
+son identificadores/huellas, no autenticadores ni controles de autorización.
+La autenticación de gateway en Mosquitto y la verificación HMAC de la trama en
+Django siguen siendo controles distintos y vigentes.
+
 ## 2. Especificación técnica
 
 ### 2.1 Credenciales por componente
 
 | Componente | Credencial | Protege | Quién la verifica |
 |---|---|---|---|
-| Coordinador | Clave HMAC simétrica propia (≥ 32 bytes aleatorios) con `key_version` | Autenticidad e integridad de cada trama LoRa | Consumidor Django |
-| Gateway | Usuario y contraseña MQTT propios (usuario = `gateway_uid`) sobre TLS | Acceso al broker y topic autorizado | Mosquitto |
+| Coordinador | Clave HMAC simétrica propia (≥ 32 bytes aleatorios) con `key_version` de trama y `master_key_version` de cifrado en reposo | Autenticidad e integridad de cada trama LoRa | Consumidor Django |
+| Gateway | Usuario (`gateway_uid`) y secreto propio `gws_…` sobre TLS; el backend guarda solo su huella HMAC (IoT-03.1, [ciclo de vida](iot-credenciales-gateway.md)) | Acceso al broker y topic autorizado | Mosquitto (integración pendiente); el backend ya verifica con `verify_gateway_credential` |
 | Consumidor | Usuario MQTT propio, solo suscripción | Lectura de los topics `up` y `status` | Mosquitto |
 | Usuario humano | Sesión JWE o cookie existente (`apps/accounts`) | API REST | Django |
 
@@ -32,17 +43,27 @@ conocerla.
 - **Almacenamiento en el backend:** a diferencia de los códigos de invitación
   (`apps/farms/invitation_codes.py`, que guardan solo una huella), **aquí no
   basta un hash**: para verificar una HMAC se necesita la clave original. Se
-  guardará **cifrada en reposo** con una clave maestra dedicada, leída del
-  entorno y validada al arrancar, siguiendo el patrón de
-  `config/invitation_code_key.py`. La dependencia `cryptography` ya está en
-  `requirements.txt`. Algoritmo y formato exactos: P-IOT-20.
+  guarda **cifrada en reposo** con AES-256-GCM y una clave maestra dedicada
+  (`COORDINATOR_KEY_ENCRYPTION_KEY`, Base64 de 32 bytes, versionada), leída del
+  entorno y validada al arrancar en producción. Implementado en IoT-03.2 (ver
+  [ciclo de vida](iot-credenciales-coordinador.md)); DEC-13 §13.
 - **Entrega al dispositivo:** se muestra una sola vez y se carga en el
   coordinador en un procedimiento físico controlado. El procedimiento es
   pendiente (P-IOT-21).
-- **Rotación:** nueva clave con `key_version` + 1. Durante un periodo de
-  transición, el backend acepta la versión anterior; luego la retira (P-IOT-22).
-- **Revocación:** al desactivar un coordinador, el backend rechaza todas sus
-  tramas, aunque la firma sea válida.
+- **Rotación inmediata:** la credencial nueva se emite con su propia versión y la
+  anterior se revoca en la misma transacción; **no hay periodo de coexistencia**.
+  Reemitir tras una pérdida usa la causa `reissued` y reinicia la ventana
+  antirreplay del coordinador en esa misma transacción, para que un equipo
+  reemplazado pueda arrancar de nuevo en 0. La rotación ordinaria no la reinicia.
+  La rotación de la clave maestra sí conserva versiones históricas para
+  descifrar credenciales antiguas.
+- **Versión persistida:** `master_key_version` debe estar entre 1 y 65535 (límite
+  de `SMALLINT UNSIGNED`); valores fuera de rango se rechazan antes de escribir.
+  No se confunde con la `key_version` que declara la trama LoRa.
+- **Revocación:** al desactivar un coordinador, el backend revoca sus credenciales
+  vigentes y rechaza todas sus tramas, aunque la firma sea válida. Reactivar no
+  las restaura. La base exige causa y fecha en toda credencial revocada;
+  `revoked_by` puede quedar `NULL` si se borra la cuenta, sin perder el historial.
 - **Auditoría:** alta, rotación y revocación como `AuditEvent`
   (`apps/trazabilidad`), **nunca con la clave** en `before_data`, `after_data` ni
   `metadata`. `record_audit_event` ya rechaza claves sensibles en los datos.
@@ -65,6 +86,13 @@ conocerla.
 - La contraseña del gateway la necesita Mosquitto, no Django. Si el backend
   participa en el aprovisionamiento, guardará como máximo una huella, no la
   contraseña.
+- **IoT-03.1 (implementado):** el backend emite, rota y revoca la credencial de
+  cada gateway y guarda solo `HMAC-SHA256(GATEWAY_CREDENTIAL_HMAC_KEY, ...)`
+  (ver [ciclo de vida](iot-credenciales-gateway.md)). Esa huella **no equivale**
+  al hash de contraseña que usa Mosquitto: la integración futura deberá
+  resolver cómo aprovisionar el broker y propagar las revocaciones sin persistir
+  secretos en texto claro. Decisión aprobada: las credenciales MQTT las
+  administrará Mosquitto; el mecanismo concreto sigue pendiente (P-IOT-24).
 
 ### 2.4 Aislamiento por finca: el mensaje no decide la finca
 
@@ -107,14 +135,25 @@ finca": permite redundancia sin abrir acceso entre fincas.
 
 **Replay:** un atacante graba una trama válida y la retransmite más tarde.
 
-- Una trama repetida trae el mismo (`coordinator_uid`, `boot_counter`, `seq`) y
-  la deduplicación la descarta: **no produce datos nuevos**.
+- Una trama repetida trae la misma identidad (`coordinator_id`,
+  `credential_id`, `boot_counter`, `seq`) (D-01, IoT-04.1) y la deduplicación
+  la descarta: **no produce datos nuevos**. Si llega con la misma identidad y
+  bytes distintos, es un conflicto que se registra (IoT-04.3-9).
 - Mientras se conserven las claves de deduplicación de un coordinador, no hace
   falta más. Si una política de retención borrara mediciones antiguas, debe
   conservarse por coordinador el último (`boot_counter`, `seq`) aceptado,
   llamado *marca de agua*, y rechazarse cualquier trama de un `boot_counter`
   inferior (P-IOT-26).
 - Un atacante **no** puede fabricar un `boot_counter` mayor sin la clave.
+- Antes de tocar la ventana, `accept_coordinator_sequence` revalida
+  `coordinator_id`, `coordinator_uid` y `farm_id` contra el coordinador
+  persistido y exige coordinador y finca activos. Un frame manipulado o de otra
+  finca se rechaza sin crear ni modificar la ventana.
+- Una reemisión reinicia la ventana en la misma transacción para permitir de
+  nuevo `boot_counter` 0; una rotación ordinaria la conserva. La credencial
+  anterior ya está revocada, así que no puede autenticar.
+- Cuando falta la credencial o el ciphertext no autentica, el backend calcula un
+  HMAC descartable para que el tiempo de rechazo no distinga ambos casos.
 
 ## 3. Explicación sencilla
 
@@ -145,9 +184,12 @@ Intento de inyectar datos en otra finca:
 ## 6. Aspectos pendientes
 
 - P-IOT-07 Verificación de firma también en el gateway.
-- P-IOT-20 Algoritmo y formato de cifrado en reposo de las claves HMAC.
+- P-IOT-20 Algoritmo y formato de cifrado en reposo de las claves HMAC
+  (resuelto en IoT-03.2: AES-256-GCM; P-IOT-12 resuelto en IoT-03.2-R3 con un
+  tag HMAC-SHA256 completo de 32 bytes; P-IOT-06 sigue abierto).
 - P-IOT-21 Procedimiento de carga de claves en el coordinador.
-- P-IOT-22 Periodo de transición en rotaciones.
+- P-IOT-22 Periodo de transición en rotaciones (resuelto en IoT-03.2: rotación
+  inmediata, sin coexistencia).
 - P-IOT-23 Cifrado de flash y arranque seguro del ESP32.
 - P-IOT-24 Mecanismo de autenticación de Mosquitto y certificados TLS.
 - P-IOT-25 Coordinador ligado a un gateway o a la finca.

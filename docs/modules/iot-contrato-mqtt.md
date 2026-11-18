@@ -1,8 +1,10 @@
 # IoT-01 — Contrato de mensajes MQTT
 
 - **Etapa:** IoT-01 (solo documentación)
-- **Estado de implementación:** Diseñada. Contrato **v1 en borrador**; se
-  congelará antes de implementar el consumidor.
+- **Estado de implementación:** El parser de payload, el consumidor MQTT y el
+  comando Django existen en el repositorio. El contrato v1 y la configuración
+  real del broker siguen sujetos a la validación operativa correspondiente.
+  El consumidor delega en la ingesta Django; no llama a un Writer independiente.
 - **Decisión asociada:** [DEC-13](../decisions/DEC-13-arquitectura-iot.md)
 - **Fecha:** 2026-11-12
 
@@ -50,8 +52,17 @@ Reglas:
   campos no definidos, el mensaje se rechaza.
 - Tamaño máximo del mensaje: a fijar con la trama (P-IOT-06). El consumidor
   rechaza lo que lo supere antes de decodificar.
-- Un mensaje = una trama. Agrupar varias tramas por mensaje al vaciar el búfer
-  queda pendiente (P-IOT-16) y solo se justificaría si el volumen lo exige.
+- **Un mensaje = una trama [Aprobado, IoT-04.1].** No se agrupan tramas por
+  mensaje en v1 (P-IOT-16 queda resuelto para v1).
+- **`frame` [Aprobado]:** contiene los bytes completos de la trama LoRa
+  (`signed_bytes` + etiqueta de 32 bytes), codificados en Base64, exactamente como
+  los recibió el gateway: el gateway **no los altera**. El backend los
+  decodificará y validará según el [contrato LoRa v1](iot-contrato-lora.md)
+  (§2.7) cuando se implemente el consumidor (IoT-06). El alfabeto Base64 exacto
+  (estándar con relleno) está pendiente de confirmar.
+- **Tamaño máximo del mensaje [Pendiente de decisión]:** depende del tamaño de
+  trama del contrato LoRa v1 (`25 + 5 × reading_count + 32` bytes; máximo
+  provisional 137 bytes, sin validación física, P-06).
 - Codificación UTF-8, JSON sin comentarios.
 
 ### 2.3 Calidad de servicio y sesión
@@ -63,13 +74,27 @@ Reglas:
     `clean_session = false`; MQTT 5: `clean_start = false` con caducidad de
     sesión). Así Mosquitto guarda los mensajes mientras el consumidor está
     desconectado.
-  - **Confirmación manual**: el PUBACK se envía después del `COMMIT` en MariaDB.
-    La biblioteca cliente que se elija en IoT-05 debe permitirlo.
+  - **Confirmación manual (recepción durable)**: el consumidor envía PUBACK
+    solo cuando la recepción durable termina con `PERSISTED` (entrega nueva
+    registrada) o `REDELIVERY` (la entrega ya estaba registrada y se reconoce
+    como retransmisión). En ambos casos el servicio de recepción devuelve el
+    resultado después del COMMIT en MariaDB, y el PUBACK se envía después.
+    No espera al procesamiento del worker.
+  - Con `PERSISTENCE_ERROR`, cualquier otro resultado o una excepción, no se
+    envía PUBACK: el consumidor deja de leer, se desconecta y, tras comprobar
+    MariaDB, se reconecta para que la sesión persistente reentregue el mensaje.
+  - `ACCEPTED`, `DUPLICATE`, `REJECTED`, `CONFLICT` y demás estados finales son
+    resultados del **procesamiento posterior** del worker durable sobre la
+    entrega ya registrada; no son condiciones previas del PUBACK.
 - Mosquitto debe tener persistencia activa para no perder la cola al
   reiniciarse. Límites de cola y caducidad: configuración operativa, fuera de
   IoT-01 (P-IOT-17).
-- Versión del protocolo (3.1.1 o 5) según lo que soporte la biblioteca del
-  firmware del gateway: pendiente (P-IOT-18).
+- El consumidor del repositorio usa MQTT 5 (BUILD-FLEPSI-02): `clean_start =
+  false`, `SessionExpiryInterval` explícito (`MQTT_SESSION_EXPIRY_SECONDS`,
+  86 400 s por defecto), suscripción QoS 1 y PUBACK manual después de la
+  persistencia durable. Validado localmente con Mosquitto 2.1.2
+  (BUILD-FLEPSI-03); la configuración efectiva del broker de producción
+  (Flespi) y de sus sesiones aún requiere validación operativa (P-IOT-17/18).
 
 ### 2.4 Implicaciones de QoS 1
 
@@ -87,15 +112,87 @@ QoS 2 (exactamente una vez), que es más costoso y no cubre los casos 3 y 4.
 
 ### 2.5 Resultados del consumidor
 
-| Resultado | Acción | PUBACK |
-|---|---|---|
-| Guardado | `COMMIT` | Sí, después del commit |
-| Duplicado | Nada que insertar | Sí |
-| Rechazo permanente (formato, firma, dispositivo desconocido o de otra finca, gateway revocado) | Registro de log y contador | Sí, para no repetirlo indefinidamente |
-| Error transitorio (base de datos caída, tiempo agotado) | Reintento con espera creciente | **No** |
+El flujo tiene dos fases con resultados distintos. El PUBACK depende **solo**
+de la primera.
 
-Los rechazos permanentes no se reprocesan. Una tabla de cuarentena para
-revisarlos queda pendiente (P-IOT-19) y no se crea por defecto.
+**A. Recepción durable (consumidor).** `MqttConsumer.handle_message`
+(`apps/iot/mqtt/consumer.py`) llama a `register_encrypted_mqtt_delivery`, que
+delega en `register_mqtt_delivery` (`apps/iot/services/mqtt_delivery_receipts.py`).
+El servicio devuelve un `MqttReceiptStatus` después de cerrar su transacción.
+
+**B. Procesamiento posterior (worker durable).** `run_mqtt_delivery_worker_once`
+(`apps/iot/services/mqtt_delivery_worker.py`) reclama entregas ya registradas y
+las procesa (`apps/iot/services/mqtt_delivery_processing.py`). El resultado se
+guarda como estado de la entrega (`IotMqttDeliveryState`). Ocurre después del
+PUBACK y no lo condiciona.
+
+| Fase | Resultado | Significado | ¿PUBACK? | Componente |
+|---|---|---|---|---|
+| Recepción | `PERSISTED` | Entrega nueva registrada; el servicio devuelve el resultado tras el COMMIT. | Sí, después del retorno. | Consumidor + `register_mqtt_delivery` |
+| Recepción | `REDELIVERY` | La `transport_key` ya estaba registrada; se reconoce como retransmisión (evento `REDELIVERY`). | Sí, después del retorno. | Consumidor + `register_mqtt_delivery` |
+| Recepción | `IDENTITY_INCONSISTENCY` | Misma `transport_key` con metadatos de transporte distintos (topic, QoS, tamaño o SHA-256); se registra el evento `IDENTITY_INCONSISTENCY`. | No. | Consumidor + `register_mqtt_delivery` |
+| Recepción | `PERSISTENCE_ERROR` | Error de base de datos; la transacción se revierte (solo el errno 1213 se reintenta de forma acotada antes, ver `iot-persistencia-entrega.md`). | No. | Consumidor + `register_mqtt_delivery` |
+| Procesamiento | `ACCEPTED` | La ingesta aceptó la trama. | No aplica (ya confirmado). | Worker |
+| Procesamiento | `DUPLICATE` | La ingesta encontró la misma identidad de trama ya aceptada. | No aplica. | Worker |
+| Procesamiento | `CONFLICT` | La identidad de trama existe con contenido distinto. | No aplica. | Worker |
+| Procesamiento | `REJECTED` | La ingesta rechazó la trama (`REJECTED_*`: payload, gateway, autorización, credencial, HMAC, generación, replay o mapeo de sensor). | No aplica. | Worker |
+| Procesamiento | `RETRY_PENDING` | Fallo transitorio con intentos disponibles; se reintenta con espera exponencial. | No aplica. | Worker (`mqtt_delivery_failures.py`) |
+| Procesamiento | `DEAD_LETTER` | Fallo permanente o intentos agotados; bloquea su carril FIFO hasta una acción explícita del operador. | No aplica. | Worker (`mqtt_delivery_failures.py`) |
+| Operación | `RESOLVED` | Entrega resuelta por una acción auditada del operador. | No aplica. | `mqtt_delivery_ops.py` |
+
+Notas:
+
+- Con cualquier resultado de recepción distinto de `PERSISTED` o
+  `REDELIVERY`, o con una excepción, `MqttConsumer._on_message` no confirma,
+  deja de leer y se desconecta. `run()` espera, comprueba MariaDB y reconecta;
+  la sesión persistente reentrega el mensaje. Tras
+  `MQTT_MAX_PERSISTENCE_FAILURES` fallos consecutivos el proceso termina con
+  error.
+- `ACCEPTED`, `DUPLICATE`, `CONFLICT` y `REJECTED` provienen de
+  `_state_for_ingestion_result`, que traduce el `IngestionStatus` de la
+  ingesta. Un `AppError` solo se convierte en denegación de autorización
+  cuando su código es 403; otros códigos se propagan como errores.
+- Los fallos del procesamiento se clasifican en `classify_failure`
+  (`mqtt_delivery_failures.py`): errores de integridad, de contrato o de
+  entrega inexistente son permanentes (`DEAD_LETTER`); otros errores de base
+  de datos, de configuración o inesperados son transitorios (`RETRY_PENDING`
+  hasta agotar intentos). La clave de payload no disponible o un fallo de
+  autenticación del payload pausan el procesamiento de forma global.
+- `TRANSIENT_ERROR` y `OPERATIONAL_ERROR` no son estados actuales: pertenecen
+  a `apps.iot.mqtt.delivery` (`DeliveryClassification`, B2.1-02), un módulo
+  histórico que solo importan las pruebas (`test_mqtt_consumer.py`) y que no
+  participa en el flujo de producción.
+
+Si el envío local de PUBACK falla, el consumidor registra el error y no marca
+el mensaje como confirmado. No se reintenta ciegamente el ACK: ante resultado
+ambiguo se deja que MQTT vuelva a entregar y la idempotencia existente resuelva
+la duplicación.
+
+### 2.6 Reintentos: valores implementados y decisión pendiente
+
+El worker durable, los leases con fencing, el backoff, la DLQ y la resolución
+operativa **están implementados** en `apps/iot/services/mqtt_delivery_*.py` y en
+los comandos `mqtt_consumer`, `mqtt_delivery_worker` y `mqtt_deliveries`.
+
+Valores por defecto vigentes en el código:
+
+| Parámetro | Valor por defecto | Configuración |
+|---|---|---|
+| Intentos antes de `DEAD_LETTER` | 8 | `IOT_MQTT_DELIVERY_MAX_ATTEMPTS` o `--max-attempts` |
+| Espera base | 5 s | `IOT_MQTT_DELIVERY_RETRY_BASE_SECONDS` o `--retry-base-seconds` |
+| Espera máxima | 900 s | `IOT_MQTT_DELIVERY_RETRY_MAX_SECONDS` o `--retry-max-seconds` |
+| Crecimiento | `base × 2**(intento-1)`, acotado | — |
+| Jitter | No implementado | — |
+| Lease de procesamiento | 60 s, renovable | `apps/iot/services/mqtt_delivery_leases.py` |
+
+Los valores aprobados en una fase anterior (tres reintentos, espera inicial de
+un segundo, máximo de 30 s y jitter de ±20 %) **no** son los valores actuales
+del código. La diferencia queda registrada como decisión abierta: o se ajusta la
+configuración por entorno, o se modifica el código en una fase autorizada.
+
+Sigue **no implementado**: la retención de 30 días para rechazos y entregas
+resueltas. Las entregas pendientes y en `DEAD_LETTER` se conservan hasta una
+resolución explícita del operador.
 
 ## 3. Explicación sencilla
 
@@ -135,9 +232,11 @@ Mensaje rechazado por contener un campo no permitido:
 
 ## 6. Aspectos pendientes
 
-- P-IOT-06 Tamaño máximo del mensaje.
+- P-IOT-06 Tamaño máximo del mensaje: pendiente de decisión (depende de P-06,
+  provisional, del contrato LoRa v1).
 - P-IOT-15 Formato del mensaje `status` y uso de *Last Will*.
-- P-IOT-16 Agrupación de tramas al vaciar el búfer.
+- ~~P-IOT-16 Agrupación de tramas~~: resuelto para v1 (una trama por mensaje).
+- Variante exacta de Base64 del campo `frame`.
 - P-IOT-17 Límites de cola y persistencia de Mosquitto.
 - P-IOT-18 Versión de MQTT (3.1.1 o 5).
 - P-IOT-19 Cuarentena de mensajes rechazados.
