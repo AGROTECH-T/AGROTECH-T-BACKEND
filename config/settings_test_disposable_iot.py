@@ -56,8 +56,8 @@ AUTHORIZED_MIGRATIONS = frozenset(BASE_AUTHORIZED_MIGRATIONS) | frozenset(
 )
 TERMINAL_MIGRATIONS = frozenset(
     {
-        ("accounts", "0006_user_can_create_farms"),
-        ("farms", "0005_farminvitation_code_hash"),
+        ("accounts", "0008_user_can_create_farms"),
+        ("farms", "0006_farminvitation_code_hash"),
         ("trazabilidad", "0013_alter_auditevent_event_type"),
         ("iot", "0021_broker_credential"),
     }

@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     """Incorpora estado activo y responsable de la desactivación."""
 
     dependencies = [
-        ("farms", "0001_initial"),
+        ("farms", "0002_farmpermission"),  # INT-02: despues de develop
         ("accounts", "0002_harden_sessions"),
     ]
 

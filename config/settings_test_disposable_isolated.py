@@ -46,22 +46,22 @@ AUTHORIZED_MIGRATIONS = frozenset(
         ("accounts", "0002_harden_sessions"),
         (
             "accounts",
-            "0003_logincode_id_logincode_purpose_user_email_verified_and_more",
+            "0005_logincode_id_logincode_purpose_user_email_verified_and_more",
         ),
         (
             "accounts",
-            "0004_session_closed_at_session_created_at_session_id_and_more",
+            "0006_session_closed_at_session_created_at_session_id_and_more",
         ),
-        ("accounts", "0005_logincode_delivery_fields"),
-        ("accounts", "0006_user_can_create_farms"),
+        ("accounts", "0007_logincode_delivery_fields"),
+        ("accounts", "0008_user_can_create_farms"),
         ("farms", "0001_initial"),
-        ("farms", "0002_farm_deactivation"),
+        ("farms", "0003_farm_deactivation"),
         (
             "farms",
-            "0003_farmmembership_left_at_farmmembership_revoked_at_and_more",
+            "0004_farmmembership_left_at_farmmembership_revoked_at_and_more",
         ),
-        ("farms", "0004_farminvitation"),
-        ("farms", "0005_farminvitation_code_hash"),
+        ("farms", "0005_farminvitation"),
+        ("farms", "0006_farminvitation_code_hash"),
         ("trazabilidad", "0001_initial"),
         ("trazabilidad", "0002_alter_auditevent_event_type"),
         ("trazabilidad", "0003_alter_auditevent_event_type"),
@@ -80,8 +80,8 @@ AUTHORIZED_MIGRATIONS = frozenset(
 
 TERMINAL_MIGRATIONS = frozenset(
     {
-        ("accounts", "0006_user_can_create_farms"),
-        ("farms", "0005_farminvitation_code_hash"),
+        ("accounts", "0008_user_can_create_farms"),
+        ("farms", "0006_farminvitation_code_hash"),
         ("trazabilidad", "0013_alter_auditevent_event_type"),
     }
 )

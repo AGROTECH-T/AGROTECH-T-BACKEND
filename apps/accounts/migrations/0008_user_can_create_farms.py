@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
     """Incorpora ``can_create_farms`` con un valor por defecto seguro."""
 
     dependencies = [
-        ("accounts", "0005_logincode_delivery_fields"),
+        ("accounts", "0007_logincode_delivery_fields"),
     ]
 
     operations = [

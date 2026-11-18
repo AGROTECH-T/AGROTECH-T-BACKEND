@@ -107,7 +107,7 @@ independencia del rol que tengan en otras fincas.
 
 ## Trazabilidad al código
 
-- `apps/accounts/models.py`, `apps/accounts/migrations/0006_user_can_create_farms.py`
+- `apps/accounts/models.py`, `apps/accounts/migrations/0008_user_can_create_farms.py`
 - `apps/accounts/services/capability_service.py`
 - `apps/accounts/management/commands/grant_farm_creation.py`, `revoke_farm_creation.py`
 - `apps/farms/capabilities.py`, `apps/farms/services.py` (`create_farm`),

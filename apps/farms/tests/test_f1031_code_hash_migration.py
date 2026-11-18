@@ -1,5 +1,5 @@
 # ruff: noqa: S101
-"""Ida y vuelta de ``farms.0005_farminvitation_code_hash`` (F10.3.1).
+"""Ida y vuelta de ``farms.0006_farminvitation_code_hash`` (F10.3.1).
 
 Propósito: aplicar, revertir y reaplicar la migración con
 ``MigrationExecutor`` en la base desechable, capturar su SQL y comprobar que
@@ -21,8 +21,8 @@ from django.utils import timezone
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-BEFORE = ("farms", "0004_farminvitation")
-TARGET = ("farms", "0005_farminvitation_code_hash")
+BEFORE = ("farms", "0005_farminvitation")
+TARGET = ("farms", "0006_farminvitation_code_hash")
 TABLE = "farm_invitations"
 LEGACY_TOKEN_HASHES = ("a" * 64, "b" * 64, "")
 SNAPSHOT_FIELDS = (

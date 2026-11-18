@@ -2,19 +2,12 @@
 
 import django.db.models.deletion
 from django.db import migrations, models
-from django.db.models import F
-
-
-def backfill_created_at(apps, schema_editor):
-    """Rellena created_at con el valor de last_seen en las filas legacy."""
-    Session = apps.get_model("accounts", "Session")
-    Session.objects.filter(created_at__isnull=True).update(created_at=F("last_seen"))
 
 
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0003_logincode_id_logincode_purpose_user_email_verified_and_more'),
+        ('accounts', '0005_logincode_id_logincode_purpose_user_email_verified_and_more'),
     ]
 
     operations = [
@@ -38,12 +31,8 @@ class Migration(migrations.Migration):
             name='token_hash',
             field=models.CharField(max_length=64, null=True, unique=True),
         ),
-        migrations.AddField(
-            model_name='session',
-            name='created_at',
-            field=models.DateTimeField(null=True),
-        ),
-        migrations.RunPython(backfill_created_at, migrations.RunPython.noop),
+        # INT-02: created_at ya existe (accounts 0004_session_created_at de
+        # develop). Solo se quita auto_now_add: el servicio de sesiones lo fija.
         migrations.AlterField(
             model_name='session',
             name='created_at',

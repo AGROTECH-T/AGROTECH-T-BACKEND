@@ -8,13 +8,12 @@ backfill con un doble en memoria. No se conectan a MariaDB ni ejecutan SQL.
 import importlib
 
 from django.db import migrations, models
-from django.db.models import F
 
 from apps.accounts.models import Session
 
 MIGRATION_MODULE = (
     "apps.accounts.migrations."
-    "0004_session_closed_at_session_created_at_session_id_and_more"
+    "0006_session_closed_at_session_created_at_session_id_and_more"
 )
 
 
@@ -87,14 +86,15 @@ def test_migration_alters_user_to_fk_before_adding_pk():
     assert names.index("user") < names.index("id")
 
 
-def test_migration_includes_backfill_for_created_at():
-    migration = _migration()
-    run_python = [
-        op for op in migration.Migration.operations
-        if isinstance(op, migrations.RunPython)
+def test_migration_reuses_created_at_from_develop():
+    """INT-02: created_at lo crea accounts 0004_session_created_at; aqui solo se altera."""
+    ops = _migration().Migration.operations
+    assert not [op for op in ops if isinstance(op, migrations.RunPython)]
+    assert not [
+        op for op in ops
+        if isinstance(op, migrations.AddField) and op.name == "created_at"
     ]
-    assert len(run_python) == 1
-    assert run_python[0].code.__name__ == "backfill_created_at"
+    assert [op for op in ops if isinstance(op, migrations.AlterField) and op.name == "created_at"]
 
 
 def test_migration_creates_composite_index():
@@ -104,27 +104,3 @@ def test_migration_creates_composite_index():
     ]
     assert len(add_index) == 1
     assert add_index[0].index.name == "sessions_user_closed_idx"
-
-
-def test_backfill_created_at_copies_last_seen():
-    """El backfill rellena created_at con el valor de last_seen (no una constante)."""
-    calls = {}
-
-    class _FakeManager:
-        def filter(self, **kwargs):
-            calls["filter"] = kwargs
-            return self
-
-        def update(self, **kwargs):
-            calls["update"] = kwargs
-
-    class _FakeSession:
-        objects = _FakeManager()
-
-    fake_apps = type("Apps", (), {"get_model": lambda self, a, m: _FakeSession})()
-
-    _migration().backfill_created_at(fake_apps, None)
-
-    assert calls["filter"] == {"created_at__isnull": True}
-    assert isinstance(calls["update"]["created_at"], F)
-    assert calls["update"]["created_at"].name == "last_seen"

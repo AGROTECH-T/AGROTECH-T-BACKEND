@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0002_harden_sessions'),
+        ('accounts', '0004_session_created_at'),  # INT-02: despues de develop
     ]
 
     operations = [

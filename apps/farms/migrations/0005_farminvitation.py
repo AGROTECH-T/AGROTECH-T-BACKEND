@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     """Define el esquema de FarmInvitation."""
 
     dependencies = [
-        ("farms", "0003_farmmembership_left_at_farmmembership_revoked_at_and_more"),
+        ("farms", "0004_farmmembership_left_at_farmmembership_revoked_at_and_more"),
     ]
 
     operations = [

@@ -69,44 +69,44 @@ def _authorized_deps():
         ("accounts", "0002_harden_sessions"): (("accounts", "0001_initial"),),
         (
             "accounts",
-            "0003_logincode_id_logincode_purpose_user_email_verified_and_more",
+            "0005_logincode_id_logincode_purpose_user_email_verified_and_more",
         ): (("accounts", "0002_harden_sessions"),),
         (
             "accounts",
-            "0004_session_closed_at_session_created_at_session_id_and_more",
+            "0006_session_closed_at_session_created_at_session_id_and_more",
         ): (
             (
                 "accounts",
-                "0003_logincode_id_logincode_purpose_user_email_verified_and_more",
+                "0005_logincode_id_logincode_purpose_user_email_verified_and_more",
             ),
         ),
-        ("accounts", "0005_logincode_delivery_fields"): (
+        ("accounts", "0007_logincode_delivery_fields"): (
             (
                 "accounts",
-                "0004_session_closed_at_session_created_at_session_id_and_more",
+                "0006_session_closed_at_session_created_at_session_id_and_more",
             ),
         ),
-        ("accounts", "0006_user_can_create_farms"): (
-            ("accounts", "0005_logincode_delivery_fields"),
+        ("accounts", "0008_user_can_create_farms"): (
+            ("accounts", "0007_logincode_delivery_fields"),
         ),
         ("farms", "0001_initial"): (("accounts", "0002_harden_sessions"),),
-        ("farms", "0002_farm_deactivation"): (
+        ("farms", "0003_farm_deactivation"): (
             ("farms", "0001_initial"),
             ("accounts", "0002_harden_sessions"),
         ),
-        ("farms", "0003_farmmembership_left_at_farmmembership_revoked_at_and_more"): (
+        ("farms", "0004_farmmembership_left_at_farmmembership_revoked_at_and_more"): (
             ("accounts", "0002_harden_sessions"),
-            ("farms", "0002_farm_deactivation"),
+            ("farms", "0003_farm_deactivation"),
         ),
-        ("farms", "0004_farminvitation"): (
-            ("farms", "0003_farmmembership_left_at_farmmembership_revoked_at_and_more"),
+        ("farms", "0005_farminvitation"): (
+            ("farms", "0004_farmmembership_left_at_farmmembership_revoked_at_and_more"),
         ),
-        ("farms", "0005_farminvitation_code_hash"): (
-            ("farms", "0004_farminvitation"),
+        ("farms", "0006_farminvitation_code_hash"): (
+            ("farms", "0005_farminvitation"),
         ),
         ("trazabilidad", "0001_initial"): (
             ("accounts", "0002_harden_sessions"),
-            ("farms", "0002_farm_deactivation"),
+            ("farms", "0003_farm_deactivation"),
         ),
         ("trazabilidad", "0002_alter_auditevent_event_type"): (
             ("trazabilidad", "0001_initial"),
@@ -180,8 +180,8 @@ def test_expected_constants(monkeypatch):
     assert module.AUTHORIZED_MIGRATIONS == frozenset(_authorized_deps())
     assert module.TERMINAL_MIGRATIONS == frozenset(
         {
-            ("accounts", "0006_user_can_create_farms"),
-            ("farms", "0005_farminvitation_code_hash"),
+            ("accounts", "0008_user_can_create_farms"),
+            ("farms", "0006_farminvitation_code_hash"),
             ("trazabilidad", "0013_alter_auditevent_event_type"),
         }
     )
@@ -218,7 +218,7 @@ def test_accepts_authorized_migration_graph(monkeypatch):
 def test_rejects_missing_authorized_migration(monkeypatch):
     module = _load(monkeypatch)
     deps = _authorized_deps()
-    del deps[("accounts", "0004_session_closed_at_session_created_at_session_id_and_more")]
+    del deps[("accounts", "0006_session_closed_at_session_created_at_session_id_and_more")]
     with pytest.raises(ImproperlyConfigured, match="migraciones autorizadas ausentes"):
         module.validate_isolated_migration_graph(deps.keys(), deps)
 
@@ -234,7 +234,7 @@ def test_rejects_unauthorized_migration(monkeypatch):
 def test_rejects_unauthorized_same_app_migration(monkeypatch):
     module = _load(monkeypatch)
     deps = _authorized_deps()
-    deps[("farms", "0006_future")] = (("farms", "0005_farminvitation_code_hash"),)
+    deps[("farms", "0006_future")] = (("farms", "0006_farminvitation_code_hash"),)
     with pytest.raises(ImproperlyConfigured, match="migraciones no autorizadas presentes"):
         module.validate_isolated_migration_graph(deps.keys(), deps)
 
@@ -250,8 +250,8 @@ def test_rejects_external_application_in_graph(monkeypatch):
 def test_rejects_wrong_terminal_nodes(monkeypatch):
     module = _load(monkeypatch)
     deps = _authorized_deps()
-    deps[("accounts", "0006_user_can_create_farms")] = (
-        ("accounts", "0005_logincode_delivery_fields"),
+    deps[("accounts", "0008_user_can_create_farms")] = (
+        ("accounts", "0007_logincode_delivery_fields"),
         ("trazabilidad", "0013_alter_auditevent_event_type"),
     )
     with pytest.raises(ImproperlyConfigured, match="nodos terminales inesperados"):

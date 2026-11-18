@@ -105,7 +105,7 @@ porque el nonce ya cambió.
 |---|---|
 | Generación, normalización y huella | `apps/farms/invitation_codes.py` |
 | Campo `FarmInvitation.code_hash` | `apps/farms/models.py` |
-| Migración | `apps/farms/migrations/0005_farminvitation_code_hash.py` |
+| Migración | `apps/farms/migrations/0006_farminvitation_code_hash.py` |
 | Ajuste `INVITATION_CODE_HMAC_KEY` | `config/platform.py` → `config/settings.py` |
 | Plantilla del correo | `apps/farms/invitation_mail.py` |
 | Reglas de la clave | `config/invitation_code_key.py` |
@@ -169,7 +169,7 @@ es `VARCHAR(64) NULL` con índice `UNIQUE`.
 - `token_hash`, los estados, los roles, las restricciones y las relaciones no
   cambian. Consultar o listar invitaciones no genera códigos.
 
-## Migración `farms.0005_farminvitation_code_hash`
+## Migración `farms.0006_farminvitation_code_hash`
 
 Solo `AddField`. Su SQL se capturó en la base desechable:
 
@@ -204,7 +204,7 @@ el procedimiento de backup y comprobación de identidad de F6-REAL-MIGRATION.
 
 ### Requisitos pendientes del despliegue
 
-1. Aplicar `farms.0005_farminvitation_code_hash`, con autorización propia,
+1. Aplicar `farms.0006_farminvitation_code_hash`, con autorización propia,
    backup y comprobación de identidad. Sin la columna, cualquier consulta de
    invitaciones falla.
 2. Definir `INVITATION_CODE_HMAC_KEY` en cada entorno antes de usar

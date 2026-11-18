@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     """Añade FarmInvitation.code_hash."""
 
     dependencies = [
-        ("farms", "0004_farminvitation"),
+        ("farms", "0005_farminvitation"),
     ]
 
     operations = [

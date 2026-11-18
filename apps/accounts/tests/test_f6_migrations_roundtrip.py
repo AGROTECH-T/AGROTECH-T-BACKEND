@@ -2,7 +2,7 @@
 """Ida y vuelta de las migraciones de BUILD F6 sobre la base desechable.
 
 Propósito: demostrar, con ``MigrationExecutor``, la aplicación, reversión y
-reaplicación de ``accounts.0006_user_can_create_farms`` y
+reaplicación de ``accounts.0008_user_can_create_farms`` y
 ``trazabilidad.0008_alter_auditevent_event_type``, capturar su SQL con
 ``sqlmigrate`` y comprobar la conservación de datos.
 Contexto: solo debe ejecutarse mediante el orquestador desechable
@@ -22,8 +22,8 @@ from django.db.migrations.recorder import MigrationRecorder
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
-ACCOUNTS_BEFORE = ("accounts", "0005_logincode_delivery_fields")
-ACCOUNTS_F6 = ("accounts", "0006_user_can_create_farms")
+ACCOUNTS_BEFORE = ("accounts", "0007_logincode_delivery_fields")
+ACCOUNTS_F6 = ("accounts", "0008_user_can_create_farms")
 TRAZ_BEFORE = ("trazabilidad", "0007_alter_auditevent_event_type")
 TRAZ_F6 = ("trazabilidad", "0008_alter_auditevent_event_type")
 NEW_EVENT_TYPES = ("farm_creation_granted", "farm_creation_revoked")

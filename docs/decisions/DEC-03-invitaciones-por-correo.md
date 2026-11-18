@@ -40,7 +40,7 @@ Las invitaciones se realizan por correo con las siguientes reglas:
 
 - Implementación backend: `apps/farms/models.py`,
   `apps/farms/invitation_services.py`, `apps/farms/views.py`,
-  `apps/farms/urls.py` y `apps/farms/migrations/0004_farminvitation.py`.
+  `apps/farms/urls.py` y `apps/farms/migrations/0005_farminvitation.py`.
 - Origen de asignación previsto: `apps/permissions/models.py` —
   `AssignmentSource.INVITATION`.
 - Permiso de presentación: `apps/farms/role_permisos_admin.py` —

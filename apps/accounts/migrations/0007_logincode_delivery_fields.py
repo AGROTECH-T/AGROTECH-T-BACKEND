@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     """Incorpora la reserva de entrega al código de acceso."""
 
     dependencies = [
-        ("accounts", "0004_session_closed_at_session_created_at_session_id_and_more"),
+        ("accounts", "0006_session_closed_at_session_created_at_session_id_and_more"),
     ]
 
     operations = [

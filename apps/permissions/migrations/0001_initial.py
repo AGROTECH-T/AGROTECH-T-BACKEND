@@ -9,8 +9,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('accounts', '0003_logincode_id_logincode_purpose_user_email_verified_and_more'),
-        ('farms', '0003_farmmembership_left_at_farmmembership_revoked_at_and_more'),
+        ('accounts', '0005_logincode_id_logincode_purpose_user_email_verified_and_more'),
+        ('farms', '0004_farmmembership_left_at_farmmembership_revoked_at_and_more'),
     ]
 
     operations = [

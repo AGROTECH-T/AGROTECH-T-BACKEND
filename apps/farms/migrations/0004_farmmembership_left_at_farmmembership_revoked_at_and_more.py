@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('accounts', '0002_harden_sessions'),
-        ('farms', '0002_farm_deactivation'),
+        ('farms', '0003_farm_deactivation'),
     ]
 
     operations = [
