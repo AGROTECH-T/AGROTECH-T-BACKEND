@@ -21,4 +21,7 @@ COPY . .
 RUN chown -R app:app /app
 USER app
 EXPOSE 8080
-CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}"]
+# Solo la API HTTP. Las migraciones se ejecutan aparte, de forma controlada
+# (ver docs/modules/iot-despliegue-render.md). El consumidor MQTT y el worker
+# durable usan esta misma imagen con su propio comando de inicio.
+CMD ["sh", "-c", "exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}"]

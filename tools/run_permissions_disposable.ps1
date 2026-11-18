@@ -11,7 +11,8 @@
     Modos:
       (sin modo)        Crea el entorno, ejecuta el preflight y lo elimina.
       -Validate         Preflight + migrate (mismo proceso) + preflight posterior + pytest.
-      -SqlMigrateOnly   Preflight + sqlmigrate trazabilidad 0007 (configuración aislada).
+      -SqlMigrateOnly   Preflight + sqlmigrate; perfil aislado por defecto o
+                        IoT 0013 con -SettingsModule config.settings_test_disposable_iot.
       -CleanupOnly      Elimina un entorno de una invocación anterior, solo con
                         -RunId y -StateFile (run-state.json) de esa invocación.
       -Validate -WithRedis
@@ -19,8 +20,9 @@
                         (F10.3.4-A) como caché de Django en lugar de LocMemCache.
 
     Garantías:
-      - SettingsModule: solo config.settings_test_disposable y
-        config.settings_test_disposable_isolated.
+      - SettingsModule: config.settings_test_disposable,
+        config.settings_test_disposable_isolated o config.settings_test_disposable_iot.
+        El perfil IoT usa el puerto de host 3318; 3306, 3307 y 3317 se rechazan.
       - El orquestador solo migra dentro de config.disposable_preflight tras un
         preflight OK sobre la conexión real (identidad del servidor, usuario,
         privilegios por SHOW GRANTS, esquema vacío, bloqueo de correo); nunca
@@ -152,6 +154,7 @@ param(
     [string]$StateFile,
     [string]$MariaDbImageDigest,
     [switch]$WithRedis,
+    [switch]$CoverageIot,
     [string]$RedisImageDigest,
     [string]$DockerCommandTimeoutSeconds,
     [string]$ComposeTimeoutSeconds,
@@ -180,6 +183,7 @@ $options = @{
     StateFile           = $StateFile
     MariaDbImageDigest  = $MariaDbImageDigest
     WithRedis           = [bool]$WithRedis
+    CoverageIot         = [bool]$CoverageIot
     RedisImageDigest    = $RedisImageDigest
 }
 foreach ($name in @(

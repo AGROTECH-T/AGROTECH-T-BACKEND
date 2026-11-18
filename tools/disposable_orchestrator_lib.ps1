@@ -35,12 +35,18 @@ $script:DisposableExitCodes = [ordered]@{
 
 $script:AllowedSettingsModules = @(
     "config.settings_test_disposable",
-    "config.settings_test_disposable_isolated"
+    "config.settings_test_disposable_isolated",
+    "config.settings_test_disposable_iot"
 )
 $script:IsolatedSettingsModule = "config.settings_test_disposable_isolated"
+$script:IotSettingsModule = "config.settings_test_disposable_iot"
 $script:DefaultSettingsModule = "config.settings_test_disposable"
 $script:RunIdPattern = "^[0-9a-f]{12}$"
-$script:ContainerPort = 3317
+$script:SettingsModuleHostPorts = @{
+    "config.settings_test_disposable" = 3317
+    "config.settings_test_disposable_isolated" = 3317
+    "config.settings_test_disposable_iot" = 3318
+}
 $script:DbUser = "agrotech_perm_validation"
 $script:LabelPurpose = "permissions-validation"
 
@@ -393,7 +399,7 @@ function Test-SettingsModuleAllowed {
 $script:OrchestratorOptionKeys = @(
     "Root", "CleanupOnly", "RunId", "Validate", "SqlMigrateOnly", "Tests", "TestsBound",
     "SettingsModule", "SettingsModuleBound", "OutputDirectory", "StateFile", "MariaDbImageDigest",
-    "WithRedis", "RedisImageDigest"
+    "WithRedis", "RedisImageDigest", "CoverageIot"
 )
 
 # Imagen prevista (R-ORQ-16). La etiqueta es la del compose; el digest lo
@@ -444,6 +450,10 @@ function Test-OrchestratorOptions {
     if ($rootProblem) { return (& $fail $rootProblem) }
     if ($validate -and $sqlOnly) { return (& $fail "-Validate y -SqlMigrateOnly son incompatibles.") }
     $withRedis = [bool]$Options.WithRedis
+    # VALIDATION-02: cobertura de apps/iot. Solo añade opciones de pytest-cov;
+    # no cambia preflight, guardas, base ni rutas de prueba.
+    $coverageIot = $Options.Contains("CoverageIot") -and [bool]$Options.CoverageIot
+    if ($coverageIot -and -not $validate) { return (& $fail "-CoverageIot solo se admite con -Validate.") }
     $imageReference = $null
     $redisImageReference = $null
     if ($cleanupOnly) {
@@ -486,10 +496,10 @@ function Test-OrchestratorOptions {
     }
     if ($testsBound -and -not $validate) { return (& $fail "-Tests solo se admite con -Validate.") }
     if ($sqlOnly) {
-        if ($settingsBound -and $settingsModule -ne $script:IsolatedSettingsModule) {
-            return (& $fail "-SqlMigrateOnly exige $($script:IsolatedSettingsModule).")
+        if ($settingsBound -and $settingsModule -notin @($script:IsolatedSettingsModule, $script:IotSettingsModule)) {
+            return (& $fail "-SqlMigrateOnly exige el perfil aislado existente o el perfil IoT.")
         }
-        $settingsModule = $script:IsolatedSettingsModule
+        if (-not $settingsBound) { $settingsModule = $script:IsolatedSettingsModule }
     }
     if (-not (Test-SettingsModuleAllowed -Name $settingsModule)) {
         return (& $fail "SettingsModule no autorizado: '$settingsModule'.")
@@ -568,6 +578,7 @@ function Test-OrchestratorOptions {
             ImageReference  = $imageReference
             WithRedis       = $withRedis
             RedisImageReference = $redisImageReference
+            CoverageIot     = $coverageIot
         }
     }
 }
@@ -622,7 +633,8 @@ function New-DockerChildEnvironment {
         [Parameter(Mandatory = $true)][string]$DbPassword,
         [Parameter(Mandatory = $true)][string]$RootPassword,
         [System.Collections.IDictionary]$Source,
-        [string]$RedisPassword
+        [string]$RedisPassword,
+        [int]$HostPort = [int]$script:SettingsModuleHostPorts[$script:DefaultSettingsModule]
     )
     $envMap = Get-BaseChildEnvironment -Source $Source
     if (-not [string]::IsNullOrEmpty($RedisPassword)) {
@@ -639,6 +651,7 @@ function New-DockerChildEnvironment {
     $envMap["DISPOSABLE_DB_USER"] = $script:DbUser
     $envMap["DISPOSABLE_DB_PASSWORD"] = $DbPassword
     $envMap["DISPOSABLE_ROOT_PASSWORD"] = $RootPassword
+    $envMap["AGROTECH_DISPOSABLE_DB_HOST_PORT"] = [string]$HostPort
     return $envMap
 }
 
@@ -2020,8 +2033,12 @@ function Test-ComposeRenderedConfig {
     $ports = @(Get-JsonValue -Object $svc -Path @("ports"))
     if ($ports.Count -ne 1) { return "se esperaba exactamente una publicación de puerto" }
     $port = $ports[0]
-    if ([string](Get-JsonValue -Object $port -Path @("host_ip")) -cne "127.0.0.1" -or [string](Get-JsonValue -Object $port -Path @("published")) -cne [string]$script:ContainerPort -or [string](Get-JsonValue -Object $port -Path @("target")) -cne "3306") {
-        return "publicación de puerto distinta de 127.0.0.1:$($script:ContainerPort)->3306"
+    $renderedHostPort = [string](Get-JsonValue -Object $port -Path @("published"))
+    if ($renderedHostPort -in @("3306", "3307", "3317")) {
+        return "puerto de host desautorizado en la configuración renderizada: $renderedHostPort"
+    }
+    if ([string](Get-JsonValue -Object $port -Path @("host_ip")) -cne "127.0.0.1" -or $renderedHostPort -cne [string]$Ctx.HostPort -or [string](Get-JsonValue -Object $port -Path @("target")) -cne "3306") {
+        return "publicación de puerto distinta de 127.0.0.1:$($Ctx.HostPort)->3306"
     }
     $svcNetworks = Get-JsonValue -Object $svc -Path @("networks")
     $svcNetworkNames = @()
@@ -2124,7 +2141,7 @@ function Test-GrantOutput {
     config.disposable_preflight.check_privileges.
     #>
     param([string[]]$Lines, [Parameter(Mandatory = $true)][string]$Database)
-    $required = @("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "INDEX", "DROP", "REFERENCES")
+    $required = @("SELECT", "INSERT", "UPDATE", "DELETE", "CREATE", "ALTER", "INDEX", "DROP", "REFERENCES", "TRIGGER")
     $granted = @{}
     $roleSeen = $false
     $rolesSeen = $false
@@ -2173,7 +2190,7 @@ function Test-GrantOutput {
 }
 
 function Test-LoopbackPortFree {
-    param([int]$Port = $script:ContainerPort)
+    param([int]$Port = [int]$script:SettingsModuleHostPorts[$script:DefaultSettingsModule])
     $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
     foreach ($listener in $listeners) {
         if ($listener.Port -eq $Port) { return $false }
@@ -2251,7 +2268,50 @@ function Get-PytestArguments {
         "--reuse-db",
         "--junitxml=$(Join-Path $Ctx.OutputDirectory 'junit.xml')"
     )
+    if (Test-CtxCoverageIot -Ctx $Ctx) {
+        $list += @(Get-CoverageIotArguments -OutputDirectory $Ctx.OutputDirectory)
+    }
     return $list + @($Ctx.Tests)
+}
+
+function Test-CtxCoverageIot {
+    <# Verdadero solo si el contexto pide cobertura de apps/iot (VALIDATION-02). #>
+    param($Ctx)
+    if ($Ctx -is [System.Collections.IDictionary]) { return ($Ctx.Contains("CoverageIot") -and [bool]$Ctx["CoverageIot"]) }
+    return $false
+}
+
+function Get-CoverageIotArguments {
+    <#
+    Escribe una configuración de coverage propia en OutputDirectory (fuera del
+    repositorio) y devuelve las opciones de pytest-cov. Mide todo apps/iot con
+    ramas, incluidas las migraciones; solo omite el código de pruebas, que no es
+    producto. El informe sin migraciones se deriva después de los mismos datos.
+    #>
+    param([Parameter(Mandatory = $true)][string]$OutputDirectory)
+    $rc = Join-Path $OutputDirectory "coveragerc-iot"
+    $data = (Join-Path $OutputDirectory "coverage-iot.data") -replace "\\", "/"
+    $content = @(
+        "[run]",
+        "branch = True",
+        "source = apps/iot",
+        "data_file = $data",
+        "omit =",
+        "    apps/iot/tests/*",
+        "",
+        "[report]",
+        "show_missing = True",
+        "skip_empty = True"
+    ) -join "`n"
+    [System.IO.File]::WriteAllText($rc, $content + "`n", (New-Object System.Text.UTF8Encoding($false)))
+    return @(
+        "--cov=apps/iot",
+        "--cov-branch",
+        "--cov-config=$rc",
+        "--cov-report=term-missing",
+        "--cov-report=xml:$(Join-Path $OutputDirectory 'coverage-iot.xml')",
+        "--cov-report=json:$(Join-Path $OutputDirectory 'coverage-iot.json')"
+    )
 }
 
 function ConvertTo-StageCode {
@@ -2318,8 +2378,10 @@ function Get-FinalMessage {
 function New-OrchestratorContext {
     param($Normalized, [string]$Root, [string]$RunId, [string]$InvocationId, [string]$OutputDirectory)
     $names = Get-DisposableNames -Id $RunId
+    $hostPort = [int]$script:SettingsModuleHostPorts[[string]$Normalized.SettingsModule]
     $ctx = @{
         Root = $Root; Mode = $Normalized.Mode; SettingsModule = $Normalized.SettingsModule
+        HostPort = $hostPort
         Tests = @($Normalized.Tests); Timeouts = $Normalized.Timeouts; Names = $names
         InvocationId = $InvocationId; OutputDirectory = $OutputDirectory
         LogDirectory = (Join-Path $OutputDirectory "logs")
@@ -2333,6 +2395,7 @@ function New-OrchestratorContext {
         OwnerToken = $null; OwnerProof = ""; ProtectedToken = $null
         ImageReference = $Normalized.ImageReference
         WithRedis = [bool](Get-JsonValue -Object $Normalized -Path @("WithRedis"))
+        CoverageIot = [bool](Get-JsonValue -Object $Normalized -Path @("CoverageIot"))
         RedisImageReference = Get-JsonValue -Object $Normalized -Path @("RedisImageReference")
         RedisComposeFile = (Join-Path $Root $script:RedisComposeFileName)
         OwnershipProblems = New-Object System.Collections.Generic.List[string]
@@ -2477,8 +2540,8 @@ function Test-ContainerIdentity {
     if ((Get-ResourceOwnership -Resource $resource -Expected $expected) -ne "Owned") { return "propiedad del contenedor no demostrada" }
     $port = Invoke-DockerCommand -Ctx $Ctx -Arguments @("port", $Ctx.Owned.ContainerId, "3306/tcp")
     $bindings = @(([string]$port.Stdout) -split "`r?`n" | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($port.ExitCode -ne 0 -or $bindings.Count -ne 1 -or $bindings[0] -ne "127.0.0.1:$($script:ContainerPort)") {
-        return "publicación del puerto distinta de 127.0.0.1:$($script:ContainerPort)"
+    if ($port.ExitCode -ne 0 -or $bindings.Count -ne 1 -or $bindings[0] -ne "127.0.0.1:$($Ctx.HostPort)") {
+        return "publicación del puerto distinta de 127.0.0.1:$($Ctx.HostPort)"
     }
     $sql = "SHOW GRANTS FOR CURRENT_USER(); SELECT CONCAT('ROLE:', IFNULL(CURRENT_ROLE(), 'NONE')); SELECT CONCAT('ROLES:', COUNT(*)) FROM information_schema.APPLICABLE_ROLES;"
     # --raw evita que --batch duplique las barras invertidas (AUD-003); el
@@ -2538,8 +2601,8 @@ function Invoke-EnvironmentStages {
         Set-RunState -Ctx $Ctx -State "ABORTED_PREEXISTING" -Detail "no se crea ni se elimina ningún recurso"
         return
     }
-    if (-not (Test-LoopbackPortFree)) {
-        Set-StageFailure $Ctx PREEXISTING_OR_OWNERSHIP "El puerto 127.0.0.1:$($script:ContainerPort) ya está en uso."
+    if (-not (Test-LoopbackPortFree -Port $Ctx.HostPort)) {
+        Set-StageFailure $Ctx PREEXISTING_OR_OWNERSHIP "El puerto 127.0.0.1:$($Ctx.HostPort) ya está en uso."
         return
     }
     $withRedis = Test-CtxWithRedis -Ctx $Ctx
@@ -2558,7 +2621,7 @@ function Invoke-EnvironmentStages {
         $redisImage = $Ctx.RedisImageReference
         $Ctx.Secrets = @($dbPassword, $rootPassword, $redisPassword)
     }
-    $Ctx.DockerEnvironment = New-DockerChildEnvironment -Names $Ctx.Names -DbPassword $dbPassword -RootPassword $rootPassword -RedisPassword $redisPassword
+    $Ctx.DockerEnvironment = New-DockerChildEnvironment -Names $Ctx.Names -DbPassword $dbPassword -RootPassword $rootPassword -RedisPassword $redisPassword -HostPort $Ctx.HostPort
     $Ctx.PythonEnvironment = New-PythonChildEnvironment -Names $Ctx.Names -SettingsModule $Ctx.SettingsModule -DbPassword $dbPassword -ReportDirectory $Ctx.OutputDirectory -RedisPassword $redisPassword
 
     $override = Join-Path $Ctx.ComposeDirectory "invocation.override.yml"

@@ -1,0 +1,38 @@
+# Redis de DESARROLLO local (cierre F10.3). No es el Redis desechable del
+# orquestador ni un Redis de producción.
+#
+# Imagen oficial fijada por digest (docs/decisions/DEC-12). Solo en loopback,
+# con contraseña (variable de usuario AGROTECH_DEV_REDIS_PASSWORD, nunca en el
+# repositorio) y sin persistencia: al recrear el contenedor se pierden los
+# contadores de intentos y throttles, que es lo esperado en desarrollo.
+# Uso: tools/dev/start_redis_local.ps1
+name: agrotech-dev
+
+services:
+  redis:
+    image: redis:7.4.12@sha256:2e3eb11462c4e3759e6972678dd051d150ff54b1e60714b3c33b701260172a90
+    container_name: agrotech-dev-redis
+    command:
+      - redis-server
+      - --port
+      - "6379"
+      - --requirepass
+      - ${AGROTECH_DEV_REDIS_PASSWORD:?define AGROTECH_DEV_REDIS_PASSWORD (tools/dev/setup_local_secrets.ps1)}
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+    environment:
+      REDISCLI_AUTH: ${AGROTECH_DEV_REDIS_PASSWORD:?define AGROTECH_DEV_REDIS_PASSWORD}
+    ports:
+      - "127.0.0.1:6379:6379"
+    tmpfs:
+      - /data:rw,noexec,nosuid,size=64m
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -h 127.0.0.1 ping | grep -q PONG"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    labels:
+      agrotech.purpose: local-development

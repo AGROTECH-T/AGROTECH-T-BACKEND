@@ -12,7 +12,7 @@ services:
       MARIADB_ROOT_PASSWORD: ${DISPOSABLE_ROOT_PASSWORD:?define DISPOSABLE_ROOT_PASSWORD}
       MARIADB_ROOT_HOST: localhost
     ports:
-      - "127.0.0.1:3317:3306"
+      - "127.0.0.1:${AGROTECH_DISPOSABLE_DB_HOST_PORT:?orchestrator must select the host port}:3306"
     tmpfs:
       - /var/lib/mysql:rw,noexec,nosuid,size=2g
     healthcheck:
