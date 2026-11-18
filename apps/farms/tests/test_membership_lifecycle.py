@@ -115,10 +115,12 @@ def test_change_role_rejects_left_membership(make_user):
         )
 
 
-def test_cannot_degrade_last_admin(make_user):
+def test_cannot_change_own_role(make_user):
     admin = make_user("11111111")
     membership = _farm(admin)
     farm_id = membership.farm_id
+    other = make_user("22222222")
+    _add(farm_id, other, FarmRole.ADMINISTRADOR)
 
     with pytest.raises(AppError) as exc:
         services.change_member_role(
@@ -127,7 +129,8 @@ def test_cannot_degrade_last_admin(make_user):
             membership_id=membership.pk,
             role=FarmRole.OPERADOR,
         )
-    assert exc.value.status_code == 409
+    assert exc.value.status_code == 403
+    assert exc.value.message == "no puedes cambiar tu propio rol"
     membership.refresh_from_db()
     assert membership.role == FarmRole.ADMINISTRADOR
 
@@ -407,7 +410,7 @@ def test_audit_failure_rolls_back_transfer(make_user, monkeypatch):
 
 
 def test_cannot_degrade_last_effective_admin(make_user):
-    """Con A activo y B con cuenta inactiva, A no puede degradarse a sí mismo."""
+    """A no puede cambiar su propio rol (tampoco con co-admin de cuenta inactiva)."""
     admin = make_user("11111111")
     membership = _farm(admin)
     farm_id = membership.farm_id
@@ -421,7 +424,8 @@ def test_cannot_degrade_last_effective_admin(make_user):
             membership_id=membership.pk,
             role=FarmRole.OPERADOR,
         )
-    assert exc.value.status_code == 409
+    assert exc.value.status_code == 403
+    assert exc.value.message == "no puedes cambiar tu propio rol"
     membership.refresh_from_db()
     assert membership.role == FarmRole.ADMINISTRADOR
 
@@ -541,18 +545,18 @@ def test_two_effective_admins_allow_non_violating_operations(make_user):
     services.change_member_role(
         user=admin_a,
         farm_id=farm_id,
-        membership_id=membership_a.pk,
+        membership_id=membership_b.pk,
         role=FarmRole.OPERADOR,
     )
-    membership_a.refresh_from_db()
-    assert membership_a.role == FarmRole.OPERADOR
+    membership_b.refresh_from_db()
+    assert membership_b.role == FarmRole.OPERADOR
 
-    services.revoke_member(user=admin_b, farm_id=farm_id, membership_id=membership_a.pk)
+    services.revoke_member(user=admin_a, farm_id=farm_id, membership_id=membership_b.pk)
     membership_a.refresh_from_db()
     membership_b.refresh_from_db()
-    assert membership_a.status == MembershipStatus.REVOKED
-    assert membership_b.status == MembershipStatus.ACTIVE
-    assert membership_b.role == FarmRole.ADMINISTRADOR
+    assert membership_b.status == MembershipStatus.REVOKED
+    assert membership_a.status == MembershipStatus.ACTIVE
+    assert membership_a.role == FarmRole.ADMINISTRADOR
 
 
 def test_rejected_operations_leave_no_partial_changes_or_events(make_user):

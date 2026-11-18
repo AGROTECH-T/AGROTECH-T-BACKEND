@@ -505,15 +505,21 @@ def change_member_role(
     membership_id: int,
     role: str,
 ) -> FarmMembership:
-    """Cambia el rol de una membresía activa; solo el administrador."""
+    """Cambia el rol de otra membresía activa; solo el administrador.
+
+    No permite cambiar el propio rol: para ceder la administración se usa
+    la transferencia.
+    """
     if role not in FarmRole.values:
         raise AppError("rol no válido", 400)
     with transaction.atomic():
-        farm, _actor, target = _admin_actor_for_membership_op(
+        farm, actor, target = _admin_actor_for_membership_op(
             user=user,
             farm_id=farm_id,
             membership_id=membership_id,
         )
+        if target.pk == actor.pk:
+            raise AppError("no puedes cambiar tu propio rol", 403)
         if target.role == FarmRole.ADMINISTRADOR and role != FarmRole.ADMINISTRADOR:
             _ensure_not_last_admin(farm_id=farm_id, membership_pk=target.pk)
         if role == FarmRole.ADMINISTRADOR and not target.user.is_active:

@@ -103,10 +103,18 @@ class FarmMemberSerializer(serializers.Serializer):
     status = serializers.CharField()
     created_at = serializers.DateTimeField()
     updated_at = serializers.DateTimeField()
+    is_self = serializers.SerializerMethodField()
 
     def get_name(self, obj) -> str:
         user = obj.user
         return " ".join(part for part in (user.first_name, user.last_name) if part).strip()
+
+    def get_is_self(self, obj) -> bool:
+        request = self.context.get("request")
+        viewer = getattr(request, "user", None) if request is not None else None
+        if viewer is None or not getattr(viewer, "is_authenticated", False):
+            return False
+        return obj.user_id == viewer.pk
 
 
 class ChangeMemberRoleSerializer(serializers.Serializer):

@@ -173,14 +173,29 @@ def test_change_role_non_admin_forbidden(login, make_user):
     assert response.status_code == 403
 
 
-def test_change_role_last_admin_conflict(login, make_user):
+def test_change_role_self_forbidden(login, make_user):
     admin, farm_id, owner = _farm(make_user)
+    other = make_user("22222229")
+    _add(farm_id, other, FarmRole.ADMINISTRADOR)
     response = login(admin).patch(
         f"/api/v1/farms/{farm_id}/members/{owner.pk}/",
         {"role": "operador"},
         format="json",
     )
-    assert response.status_code == 409
+    assert response.status_code == 403
+    assert response.data["error"] == "no puedes cambiar tu propio rol"
+    owner.refresh_from_db()
+    assert owner.role == FarmRole.ADMINISTRADOR
+
+
+def test_member_payload_marks_self(login, make_user):
+    admin, farm_id, owner = _farm(make_user)
+    other = make_user("22222230")
+    other_m = _add(farm_id, other, FarmRole.OPERADOR)
+    me = login(admin).get(f"/api/v1/farms/{farm_id}/members/{owner.pk}/")
+    them = login(admin).get(f"/api/v1/farms/{farm_id}/members/{other_m.pk}/")
+    assert me.status_code == 200 and me.data["is_self"] is True
+    assert them.status_code == 200 and them.data["is_self"] is False
 
 
 # --- Revocación ---

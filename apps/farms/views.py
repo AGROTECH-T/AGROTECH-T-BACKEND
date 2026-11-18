@@ -284,7 +284,9 @@ class FarmMemberListView(APIView):
         )
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(members, request, view=self)
-        serializer = FarmMemberSerializer(page, many=True)
+        serializer = FarmMemberSerializer(
+            page, many=True, context={"request": request}
+        )
         return paginator.get_paginated_response(serializer.data)
 
 
@@ -307,7 +309,9 @@ class FarmMemberDetailView(APIView):
             farm_id=farm_id,
             membership_id=membership_id,
         )
-        return Response(FarmMemberSerializer(member).data)
+        return Response(
+            FarmMemberSerializer(member, context={"request": request}).data
+        )
 
     @extend_schema(
         tags=["farms"],
@@ -331,7 +335,9 @@ class FarmMemberDetailView(APIView):
             membership_id=membership_id,
             role=serializer.validated_data["role"],
         )
-        return Response(FarmMemberSerializer(member).data)
+        return Response(
+            FarmMemberSerializer(member, context={"request": request}).data
+        )
 
     @extend_schema(
         tags=["farms"],
