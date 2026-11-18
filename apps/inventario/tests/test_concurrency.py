@@ -11,7 +11,6 @@ from apps.accounts.errors import AppError
 from apps.farms import services as farm_services
 from apps.farms.services import create_farm, deactivate_farm
 from apps.inventario import services
-from apps.inventario.catalog import InventoryCategory, InventoryUnit
 from apps.inventario.models import Movement, MovementKind, Product
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -48,8 +47,8 @@ def test_create_product_cannot_finish_after_deactivation(make_user, monkeypatch)
                 farm_id=farm_id,
                 name="Fertilizante",
                 barcode="770001",
-                unit=InventoryUnit.KG,
-                category=InventoryCategory.FERTILIZANTES,
+                unit_code="bulto_40kg",
+                category_code="alimento_concentrado",
             )
         except AppError as exc:
             return exc
@@ -79,8 +78,8 @@ def test_register_movement_cannot_finish_after_deactivation(make_user, monkeypat
         farm_id=farm_id,
         name="Fertilizante",
         barcode="770001",
-        unit=InventoryUnit.KG,
-        category=InventoryCategory.FERTILIZANTES,
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
     )
     ready, release = _delay_writer_after_membership_check(monkeypatch)
 

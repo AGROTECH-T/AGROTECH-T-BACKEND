@@ -8,7 +8,6 @@ from apps.accounts.errors import AppError
 from apps.farms.models import Farm, FarmMembership, FarmRole
 from apps.farms.services import create_farm, deactivate_farm
 from apps.inventario import services
-from apps.inventario.catalog import InventoryCategory, InventoryUnit
 from apps.inventario.models import Movement, MovementKind, Product
 
 
@@ -31,8 +30,8 @@ def _create_product(*, user, farm_id: int, barcode: str = "770001") -> Product:
         farm_id=farm_id,
         name="Fertilizante",
         barcode=barcode,
-        unit=InventoryUnit.KG,
-        category=InventoryCategory.FERTILIZANTES,
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
     )
 
 

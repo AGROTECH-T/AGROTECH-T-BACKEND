@@ -34,7 +34,6 @@ from apps.farms.models import (
 )
 from apps.farms.tests.conftest import VALID_PASSWORD
 from apps.inventario import services as inventory
-from apps.inventario.catalog import InventoryCategory, InventoryUnit
 from apps.inventario.models import MovementKind
 from apps.inventario.services.membership import WRITE_ROLES
 from apps.trazabilidad.models import AuditEvent, EventType
@@ -68,8 +67,8 @@ def _product(admin, farm_id):
         farm_id=farm_id,
         name="Maíz",
         barcode="7701234567890",
-        unit=InventoryUnit.KG,
-        category=InventoryCategory.CONCENTRADOS,
+        unit_code="bulto_40kg",
+        category_code="alimento_concentrado",
         min_stock=Decimal("1"),
     )
 
