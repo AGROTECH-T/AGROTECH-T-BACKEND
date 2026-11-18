@@ -41,6 +41,8 @@ class FarmCapabilitiesSerializer(serializers.Serializer):
     can_manage_invitations = serializers.BooleanField(read_only=True)
     can_read_inventory = serializers.BooleanField(read_only=True)
     can_write_inventory = serializers.BooleanField(read_only=True)
+    can_read_galpon = serializers.BooleanField(read_only=True)
+    can_write_galpon = serializers.BooleanField(read_only=True)
     can_read_iot = serializers.BooleanField(read_only=True)
     can_manage_iot = serializers.BooleanField(read_only=True)
 

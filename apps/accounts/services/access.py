@@ -38,15 +38,38 @@ def puede_crear_finca(user: User) -> bool:
 def modulos_visibles(user: User) -> list[str]:
     """Secciones del menú que esa cuenta puede abrir.
 
+    Plataforma (superadmin / administrador) ve todo. Un trabajador solo ve los
+    módulos que le conceden los permisos efectivos de sus fincas activas
+    (``apps.farms.permissions``), no por el mero hecho de tener membresía.
+
     @param user Cuenta autenticada.
     @returns Identificadores de módulo en el orden del menú.
     """
     if user.is_superadmin or user.is_administrador:
         return list(MODULOS_COMPLETOS)
-    memberships = list(user.farm_memberships.filter(status=MembershipStatus.ACTIVE))
+    memberships = list(
+        user.farm_memberships.filter(status=MembershipStatus.ACTIVE)
+        .select_related("farm", "user")
+        .prefetch_related("extra_permissions")
+    )
     if not memberships:
         return [HOME]
-    modulos = [HOME, FINCAS, INVENTARIO, GALPON, IOT]
+
+    # Fuente única operativa: misma matriz que capacidades e inventario/IoT.
+    from apps.farms import permissions as farm_permissions
+
+    granted: set[str] = set()
+    for membership in memberships:
+        if membership.farm.is_active:
+            granted |= farm_permissions.permisos_efectivos(membership)
+
+    modulos = [HOME, FINCAS]
+    if farm_permissions.VER_INVENTARIO in granted:
+        modulos.append(INVENTARIO)
+    if farm_permissions.VER_GALPON in granted:
+        modulos.append(GALPON)
+    if farm_permissions.VER_IOT in granted:
+        modulos.append(IOT)
     if any(membership.role == FarmRole.ADMINISTRADOR for membership in memberships):
         modulos.append(CONFIGURACION)
     return modulos

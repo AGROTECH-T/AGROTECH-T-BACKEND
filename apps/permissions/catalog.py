@@ -1,12 +1,12 @@
-"""Catálogo centralizado de permisos operativos.
+"""Catálogo auxiliar de permisos operativos (matriz legada / techos).
 
-Propósito: definir de forma única y tipada los permisos operativos del sistema,
-sus techos por rol y las reglas de identificación.
+Propósito: tipar permisos ``module.action`` y techos por rol para el servicio
+de asignaciones de ``apps.permissions``.
 
-Contexto: el catálogo vive en código (no en base de datos) porque los módulos y
-acciones se agregan con el desarrollo, no en tiempo de ejecución. Las
-asignaciones y restricciones se persistirán en etapas posteriores. Los permisos
-estructurales y de autogestión no forman parte de este catálogo.
+Contexto: la autorización de inventario, galpón, IoT, capacidades de finca y
+menú de módulos usa ``apps.farms.permissions`` (p. ej. ``ver_inventario``).
+No usar este catálogo para decidir 403 en endpoints de negocio; apuntar a
+``apps.farms.permissions``.
 """
 import re
 from dataclasses import dataclass

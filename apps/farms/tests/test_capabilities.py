@@ -163,24 +163,28 @@ EXPECTED = {
         "can_edit_farm": True, "can_deactivate_farm": True, "can_reactivate_farm": False,
         "can_view_history": True, "can_manage_members": True, "can_manage_invitations": True,
         "can_read_inventory": True, "can_write_inventory": True,
+        "can_read_galpon": True, "can_write_galpon": True,
         "can_read_iot": True, "can_manage_iot": True,
     },
     (FarmRole.ADMINISTRADOR, False): {
         "can_edit_farm": False, "can_deactivate_farm": False, "can_reactivate_farm": True,
         "can_view_history": True, "can_manage_members": False, "can_manage_invitations": False,
         "can_read_inventory": False, "can_write_inventory": False,
+        "can_read_galpon": False, "can_write_galpon": False,
         "can_read_iot": False, "can_manage_iot": False,
     },
     (FarmRole.OPERADOR, True): {
         "can_edit_farm": False, "can_deactivate_farm": False, "can_reactivate_farm": False,
         "can_view_history": False, "can_manage_members": False, "can_manage_invitations": False,
         "can_read_inventory": True, "can_write_inventory": True,
+        "can_read_galpon": True, "can_write_galpon": True,
         "can_read_iot": True, "can_manage_iot": False,
     },
     (FarmRole.CONSULTA, True): {
         "can_edit_farm": False, "can_deactivate_farm": False, "can_reactivate_farm": False,
         "can_view_history": False, "can_manage_members": False, "can_manage_invitations": False,
         "can_read_inventory": True, "can_write_inventory": False,
+        "can_read_galpon": True, "can_write_galpon": False,
         "can_read_iot": True, "can_manage_iot": False,
     },
 }

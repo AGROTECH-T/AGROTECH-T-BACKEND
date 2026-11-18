@@ -39,6 +39,8 @@ CAPABILITY_KEYS = (
     "can_manage_invitations",
     "can_read_inventory",
     "can_write_inventory",
+    "can_read_galpon",
+    "can_write_galpon",
     "can_read_iot",
     "can_manage_iot",
 )
@@ -51,7 +53,7 @@ def farm_capabilities(membership: FarmMembership) -> dict[str, bool]:
     account_active = membership.user.is_active
     is_admin = active_member and membership.role == FarmRole.ADMINISTRADOR
     manages = is_admin and farm_active and account_active
-    reads_inventory = active_member and farm_active
+    operates = active_member and farm_active
     granted = farm_permissions.permisos_efectivos(membership) if active_member else set()
     return {
         "can_edit_farm": is_admin and farm_active,
@@ -60,13 +62,15 @@ def farm_capabilities(membership: FarmMembership) -> dict[str, bool]:
         "can_view_history": is_admin,
         "can_manage_members": manages,
         "can_manage_invitations": manages,
-        "can_read_inventory": reads_inventory and farm_permissions.VER_INVENTARIO in granted,
+        "can_read_inventory": operates and farm_permissions.VER_INVENTARIO in granted,
         "can_write_inventory": (
-            reads_inventory and farm_permissions.REGISTRAR_MOVIMIENTOS in granted
+            operates and farm_permissions.REGISTRAR_MOVIMIENTOS in granted
         ),
-        "can_read_iot": reads_inventory and farm_permissions.VER_IOT in granted,
+        "can_read_galpon": operates and farm_permissions.VER_GALPON in granted,
+        "can_write_galpon": operates and farm_permissions.REGISTRAR_GALPON in granted,
+        "can_read_iot": operates and farm_permissions.VER_IOT in granted,
         "can_manage_iot": (
-            reads_inventory and account_active and farm_permissions.GESTIONAR_IOT in granted
+            operates and account_active and farm_permissions.GESTIONAR_IOT in granted
         ),
     }
 
