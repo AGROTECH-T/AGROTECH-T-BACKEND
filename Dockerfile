@@ -20,4 +20,8 @@ FROM base AS production
 COPY . .
 RUN chown -R app:app /app
 EXPOSE 8080
-CMD ["sh", "-c", "mkdir -p /app/media && chown app:app /app/media && su -s /bin/sh app -c 'python manage.py migrate && python manage.py seed_usuarios && gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}'"]
+# INT-02: la API migra al arrancar como en develop (Render sin pre-deploy).
+# RUN_MIGRATIONS=0 lo desactiva cuando las migraciones se ejecutan aparte
+# (ver docs/modules/iot-despliegue-render.md). El consumidor MQTT y el worker
+# IoT usan esta imagen con su propio comando de inicio y no migran.
+CMD ["sh", "-c", "mkdir -p /app/media && chown app:app /app/media && su -s /bin/sh app -c 'if [ \"${RUN_MIGRATIONS:-1}\" = \"1\" ]; then python manage.py migrate --noinput; fi && python manage.py seed_usuarios && exec gunicorn config.wsgi:application --bind 0.0.0.0:${PORT:-8080} --workers ${WEB_CONCURRENCY:-1}'"]
