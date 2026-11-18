@@ -132,6 +132,18 @@ def _authorized_deps():
         ("trazabilidad", "0009_alter_auditevent_event_type"): (
             ("trazabilidad", "0008_alter_auditevent_event_type"),
         ),
+        ("trazabilidad", "0010_alter_auditevent_event_type"): (
+            ("trazabilidad", "0009_alter_auditevent_event_type"),
+        ),
+        ("trazabilidad", "0011_alter_auditevent_event_type"): (
+            ("trazabilidad", "0010_alter_auditevent_event_type"),
+        ),
+        ("trazabilidad", "0012_alter_auditevent_event_type"): (
+            ("trazabilidad", "0011_alter_auditevent_event_type"),
+        ),
+        ("trazabilidad", "0013_alter_auditevent_event_type"): (
+            ("trazabilidad", "0012_alter_auditevent_event_type"),
+        ),
     }
 
 
@@ -164,13 +176,13 @@ def test_expected_constants(monkeypatch):
     ]
     assert not hasattr(module, "MIGRATION_MODULES")
     assert module.AUTHORIZED_APPS == frozenset({"accounts", "farms", "trazabilidad"})
-    assert len(module.AUTHORIZED_MIGRATIONS) == 20
+    assert len(module.AUTHORIZED_MIGRATIONS) == 24
     assert module.AUTHORIZED_MIGRATIONS == frozenset(_authorized_deps())
     assert module.TERMINAL_MIGRATIONS == frozenset(
         {
             ("accounts", "0006_user_can_create_farms"),
             ("farms", "0005_farminvitation_code_hash"),
-            ("trazabilidad", "0009_alter_auditevent_event_type"),
+            ("trazabilidad", "0013_alter_auditevent_event_type"),
         }
     )
 
@@ -240,7 +252,7 @@ def test_rejects_wrong_terminal_nodes(monkeypatch):
     deps = _authorized_deps()
     deps[("accounts", "0006_user_can_create_farms")] = (
         ("accounts", "0005_logincode_delivery_fields"),
-        ("trazabilidad", "0009_alter_auditevent_event_type"),
+        ("trazabilidad", "0013_alter_auditevent_event_type"),
     )
     with pytest.raises(ImproperlyConfigured, match="nodos terminales inesperados"):
         module.validate_isolated_migration_graph(deps.keys(), deps)
@@ -316,9 +328,9 @@ def test_trazabilidad_migration_state_matches_event_type():
     field = state.models[("trazabilidad", "auditevent")].fields["event_type"]
     migration_choices = [tuple(choice) for choice in field.choices]
     model_choices = [tuple(choice) for choice in EventType.choices]
-    assert len(model_choices) == 39
+    assert len(model_choices) == 54
     assert migration_choices == model_choices
-    assert field.max_length == 40
+    assert field.max_length == 48
 
 
 def test_expected_isolated_tables_match_models(monkeypatch):

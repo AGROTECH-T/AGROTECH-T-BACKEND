@@ -233,6 +233,11 @@ def test_composite_foreign_keys_exist():
         "iot_sensor_coord_farm_fk": "coordinator_id,farm_id",
         "iot_cg_coord_farm_fk": "coordinator_id,farm_id",
         "iot_cg_gw_farm_fk": "gateway_id,farm_id",
+        "iot_fc_frame_farm_fk": "frame_id,farm_id",
+        "iot_fc_gateway_farm_fk": "gateway_id,farm_id",
+        # Added by iot.0010_sensor_source (SensorSource procedencia física).
+        "iot_ss_coord_farm_fk": "coordinator_id,farm_id",
+        "iot_sensor_source_coord_farm_fk": "source_id,coordinator_id,farm_id",
     }
 
 

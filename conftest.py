@@ -10,6 +10,8 @@ Configuraciones autorizadas (lista cerrada):
 - ``config.settings_test_disposable``: contenedor MariaDB desechable.
 - ``config.settings_test_disposable_isolated``: contenedor desechable con el
   grafo de migraciones restringido a accounts, farms y trazabilidad.
+- ``config.settings_test_disposable_iot``: contenedor desechable IoT con su
+  puerto y grafo de migraciones propios.
 
 Cada configuración se valida con sus propios validadores, importados de forma
 perezosa: solo se importa el módulo activo, porque cada uno valida su destino
@@ -31,11 +33,12 @@ from django.core.exceptions import ImproperlyConfigured
 LIVE_SETTINGS_MODULE = "config.settings_test"
 DISPOSABLE_SETTINGS_MODULE = "config.settings_test_disposable"
 ISOLATED_SETTINGS_MODULE = "config.settings_test_disposable_isolated"
+IOT_SETTINGS_MODULE = "config.settings_test_disposable_iot"
 AUTHORIZED_SETTINGS_MODULES = frozenset(
-    {LIVE_SETTINGS_MODULE, DISPOSABLE_SETTINGS_MODULE, ISOLATED_SETTINGS_MODULE}
+    {LIVE_SETTINGS_MODULE, DISPOSABLE_SETTINGS_MODULE, ISOLATED_SETTINGS_MODULE, IOT_SETTINGS_MODULE}
 )
 DISPOSABLE_SETTINGS_MODULES = frozenset(
-    {DISPOSABLE_SETTINGS_MODULE, ISOLATED_SETTINGS_MODULE}
+    {DISPOSABLE_SETTINGS_MODULE, ISOLATED_SETTINGS_MODULE, IOT_SETTINGS_MODULE}
 )
 
 
@@ -57,6 +60,8 @@ def _settings_guard(settings_module):
         import config.settings_test_disposable as guard
     elif settings_module == ISOLATED_SETTINGS_MODULE:
         import config.settings_test_disposable_isolated as guard
+    elif settings_module == IOT_SETTINGS_MODULE:
+        import config.settings_test_disposable_iot as guard
     else:
         raise ImproperlyConfigured(
             f"módulo de settings no autorizado: {settings_module!r}"
@@ -97,14 +102,21 @@ def _verify_live_disposable_database(connection, db_blocker) -> None:
     InnoDB y existencia del esquema dentro del desbloqueo temporal de
     pytest-django.
     """
-    from config.settings_test_disposable import validate_live_disposable_database
-
     if db_blocker is None:
         raise ImproperlyConfigured(
             "no está disponible django_db_blocker para verificar la base"
         )
     with db_blocker.unblock():
-        validate_live_disposable_database(connection)
+        if _active_settings_module() == IOT_SETTINGS_MODULE:
+            from config.settings_test_disposable_iot import (
+                validate_live_iot_disposable_database,
+            )
+
+            validate_live_iot_disposable_database(connection)
+        else:
+            from config.settings_test_disposable import validate_live_disposable_database
+
+            validate_live_disposable_database(connection)
 
 
 def _validate_runner_credentials(settings_module) -> None:
@@ -114,6 +126,8 @@ def _validate_runner_credentials(settings_module) -> None:
         guard.validate_disposable_runtime_environment()
         if settings_module == ISOLATED_SETTINGS_MODULE:
             guard.validate_isolated_migrations()
+        elif settings_module == IOT_SETTINGS_MODULE:
+            guard.validate_iot_migrations()
         return
     guard.validate_test_credentials(
         os.environ.get("TEST_DB_USER"),

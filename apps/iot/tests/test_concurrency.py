@@ -19,6 +19,7 @@ from apps.farms import services as farm_services
 from apps.farms.services import deactivate_farm
 from apps.iot import services as iot
 from apps.iot.models import CoordinatorGateway, Gateway, Sensor
+from apps.iot.tests.conftest import make_source_uid
 
 pytestmark = pytest.mark.django_db(transaction=True)
 
@@ -57,10 +58,14 @@ def test_parallel_authorizations_leave_one_active(admin, farm_id):
 
 def test_parallel_sensors_on_same_channel_leave_one(admin, farm_id):
     coordinator = iot.create_coordinator(user=admin, farm_id=farm_id, name="C")
+    source_uid = make_source_uid(
+        user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid
+    )
 
     results = _run_in_parallel(
         lambda: iot.create_sensor(
-            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid,
+            source_uid=source_uid, channel=1,
             metric="temperature",
         )
     )

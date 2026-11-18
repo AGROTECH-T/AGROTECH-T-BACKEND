@@ -8,10 +8,27 @@ orquestador desechable (``tools/run_permissions_disposable.ps1 -Validate``).
 """
 import pytest
 from django.contrib.auth.hashers import make_password
+from django.core.management import call_command
 
 from apps.accounts.models import User
 from apps.farms.models import FarmMembership, FarmRole
 from apps.farms.services import create_farm
+from apps.iot.models import Coordinator, SensorSource, SensorSourceRole
+
+
+def make_source_uid(*, user, farm_id: int, coordinator_uid: str):
+    """Reuse a neutral ORM source for tests focused on other domain rules."""
+    coordinator = Coordinator.objects.get(farm_id=farm_id, uid=coordinator_uid)
+    source = SensorSource.objects.filter(coordinator=coordinator, is_active=True).first()
+    if source is None:
+        source = SensorSource.objects.create(
+            farm_id=farm_id,
+            coordinator=coordinator,
+            name="Fuente de prueba",
+            role=SensorSourceRole.PRIMARY,
+            created_by=user,
+        )
+    return source.uid
 
 
 @pytest.fixture
@@ -80,3 +97,33 @@ def operator(join, farm_id) -> User:
 def viewer(join, farm_id) -> User:
     """Cuenta de consulta de la finca principal."""
     return join(farm_id, FarmRole.CONSULTA, "33333333")
+
+
+@pytest.fixture(autouse=True)
+def _truncate_transactional_history(request):
+    """Limpiar con TRUNCATE antes del flush DELETE de pytest-django.
+
+    Los triggers históricos rechazan DELETE; TRUNCATE no dispara triggers de
+    fila. Resolver ``transactional_db`` aquí garantiza que este finalizador se
+    ejecute antes del teardown de ``_django_db_helper``, que limpia con DELETE.
+    """
+    marker = request.node.get_closest_marker("django_db")
+    transactional = "transactional_db" in request.fixturenames or (
+        bool(marker)
+        and (
+            bool(marker.kwargs.get("transaction"))
+            or bool(marker.args and marker.args[0])
+        )
+    )
+    if not transactional:
+        yield
+        return
+    request.getfixturevalue("transactional_db")
+    yield
+    call_command(
+        "flush",
+        verbosity=0,
+        interactive=False,
+        reset_sequences=True,
+        inhibit_post_migrate=True,
+    )

@@ -321,10 +321,18 @@ def test_privileges_rejected(grants, role, roles, status):
 
 def test_explicit_privilege_list_accepted():
     grants = GOOD_GRANTS[:1] + [
-        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER "
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER, TRIGGER "
         f"ON {DB_TARGET} TO {USER}"
     ]
     assert _run(FakeConnection(grants=grants)).ok
+
+
+def test_explicit_privilege_list_requires_trigger():
+    grants = GOOD_GRANTS[:1] + [
+        "GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, REFERENCES, INDEX, ALTER "
+        f"ON {DB_TARGET} TO {USER}"
+    ]
+    assert _run(FakeConnection(grants=grants)).status == pf.STATUS_INSUFFICIENT_PRIVILEGES
 
 
 # --- AUD-003/AUD-004: destino de SHOW GRANTS ---------------------------------
@@ -446,6 +454,16 @@ def test_expected_identity_derives_from_existing_guard(monkeypatch):
     assert expected.server_port == "3306"
     assert expected.user == "agrotech_perm_validation"
     assert {"agrotech_db", "agrotech_t"} <= expected.protected
+
+
+def test_iot_expected_identity_uses_iot_profile_host_port(monkeypatch):
+    monkeypatch.setenv("AGROTECH_DISPOSABLE_CONFIRM", "1")
+    monkeypatch.setenv("AGROTECH_DISPOSABLE_RUN_ID", RUN_ID)
+    monkeypatch.setenv("AGROTECH_DISPOSABLE_DB_PASSWORD", "valor-de-prueba")
+    import config.settings_test_disposable_iot as iot_guard
+
+    expected = pf.expected_identity("config.settings_test_disposable_iot", RUN_ID)
+    assert expected.port == iot_guard.IOT_TEST_DB_PORT == "3318"
 
 
 # --- 8.6 Correo y .env ------------------------------------------------------

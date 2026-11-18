@@ -20,6 +20,7 @@ from apps.iot.identifiers import IdentifierKind, is_valid_identifier
 from apps.iot.models import Coordinator, CoordinatorGateway, Gateway, Sensor
 from apps.iot.services import _common
 from apps.iot.services import sensors as sensors_service
+from apps.iot.tests.conftest import make_source_uid
 from apps.trazabilidad.models import AuditEvent, EventType
 from apps.trazabilidad.services import AUDIT_REASON_MAX_LENGTH
 
@@ -90,6 +91,7 @@ def test_create_sensor_with_catalog_metric(admin, farm_id):
         user=admin,
         farm_id=farm_id,
         coordinator_uid=coordinator.uid.lower(),
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         channel=1,
         metric="relative_humidity",
     )
@@ -106,7 +108,9 @@ def test_create_sensor_rejects_unknown_metric(admin, farm_id, metric):
     _gateway, coordinator = _setup(admin, farm_id)
     _error(
         lambda: iot.create_sensor(
-            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1, metric=metric
+            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
+            channel=1, metric=metric
         ),
         400,
     )
@@ -121,6 +125,7 @@ def test_create_sensor_rejects_invalid_channel(admin, farm_id, channel):
             user=admin,
             farm_id=farm_id,
             coordinator_uid=coordinator.uid,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
             channel=channel,
             metric="temperature",
         ),
@@ -146,6 +151,7 @@ def test_sensor_channel_accepts_full_column_range(admin, farm_id):
             user=admin,
             farm_id=farm_id,
             coordinator_uid=coordinator.uid,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
             channel=channel,
             metric="temperature",
         )
@@ -174,6 +180,7 @@ def test_create_sensor_rejects_busy_channel(admin, farm_id):
         "user": admin,
         "farm_id": farm_id,
         "coordinator_uid": coordinator.uid,
+        "source_uid": make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         "channel": 3,
         "metric": "temperature",
     }
@@ -188,7 +195,8 @@ def test_create_sensor_requires_active_coordinator(admin, farm_id):
     iot.deactivate_coordinator(user=admin, farm_id=farm_id, uid=coordinator.uid)
     _error(
         lambda: iot.create_sensor(
-            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid), channel=1,
             metric="temperature",
         ),
         409,
@@ -347,7 +355,8 @@ def test_deactivate_gateway_revokes_its_authorizations(admin, farm_id):
     revoked = _events(EventType.IOT_GATEWAY_AUTHORIZATION_REVOKED).get()
     assert revoked.metadata == {"cause": "gateway_deactivated"}
     event = _events(EventType.IOT_GATEWAY_DEACTIVATED).get()
-    assert event.reason == "averiado" and event.metadata == {"revoked_authorizations": 1}
+    assert event.reason == "averiado"
+    assert event.metadata == {"revoked_authorizations": 1, "revoked_gwcreds": 0}
     _error(lambda: iot.deactivate_gateway(user=admin, farm_id=farm_id, uid=gateway.uid), 409)
 
 
@@ -359,6 +368,7 @@ def test_deactivate_coordinator_cascades_to_sensors_and_authorizations(admin, fa
     for channel, metric in ((1, "temperature"), (2, "relative_humidity")):
         iot.create_sensor(
             user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=channel,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
             metric=metric,
         )
     iot.deactivate_coordinator(user=admin, farm_id=farm_id, uid=coordinator.uid)
@@ -373,13 +383,18 @@ def test_deactivate_coordinator_cascades_to_sensors_and_authorizations(admin, fa
         "coordinator_deactivated"
     }
     event = _events(EventType.IOT_COORDINATOR_DEACTIVATED).get()
-    assert event.metadata == {"revoked_authorizations": 1, "deactivated_sensors": 2}
+    assert event.metadata == {
+        "revoked_authorizations": 1,
+        "deactivated_sensors": 2,
+        "revoked_coordcreds": 0,
+    }
     assert Gateway.objects.get(pk=gateway.pk).is_active
 
 
 def test_deactivate_sensor_frees_channel(admin, farm_id):
     _gateway, coordinator = _setup(admin, farm_id)
     kwargs = {"user": admin, "farm_id": farm_id, "coordinator_uid": coordinator.uid,
+              "source_uid": make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
               "channel": 1, "metric": "temperature"}
     first = iot.create_sensor(**kwargs)
     iot.deactivate_sensor(user=admin, farm_id=farm_id, uid=first.uid)
@@ -422,7 +437,11 @@ def test_reactivate_gateway_does_not_restore_authorizations(admin, farm_id):
     assert not CoordinatorGateway.objects.filter(active_pair=1).exists()
     event = _events(EventType.IOT_GATEWAY_REACTIVATED).get()
     assert event.reason == "reparado"
-    assert event.metadata == {"restored_authorizations": 0, "restored_sensors": 0}
+    assert event.metadata == {
+        "restored_authorizations": 0,
+        "restored_sensors": 0,
+        "restored_gwcreds": 0,
+    }
     _error(
         lambda: iot.reactivate_gateway(user=admin, farm_id=farm_id, uid=gateway.uid, reason="x"),
         409,
@@ -433,6 +452,7 @@ def test_reactivate_coordinator_does_not_restore_sensors(admin, farm_id):
     _gateway, coordinator = _setup(admin, farm_id)
     sensor = iot.create_sensor(
         user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         metric="temperature",
     )
     iot.deactivate_coordinator(user=admin, farm_id=farm_id, uid=coordinator.uid)
@@ -446,6 +466,7 @@ def test_reactivate_sensor_requires_active_coordinator(admin, farm_id):
     _gateway, coordinator = _setup(admin, farm_id)
     sensor = iot.create_sensor(
         user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         metric="temperature",
     )
     iot.deactivate_coordinator(user=admin, farm_id=farm_id, uid=coordinator.uid)
@@ -463,6 +484,7 @@ def test_reactivate_sensor_requires_active_coordinator(admin, farm_id):
 def test_reactivate_sensor_requires_free_channel(admin, farm_id):
     _gateway, coordinator = _setup(admin, farm_id)
     kwargs = {"user": admin, "farm_id": farm_id, "coordinator_uid": coordinator.uid,
+              "source_uid": make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
               "channel": 1, "metric": "temperature"}
     old = iot.create_sensor(**kwargs)
     iot.deactivate_sensor(user=admin, farm_id=farm_id, uid=old.uid)
@@ -476,6 +498,7 @@ def test_reactivate_sensor_rejects_metric_outside_catalog(admin, farm_id, monkey
     _gateway, coordinator = _setup(admin, farm_id)
     sensor = iot.create_sensor(
         user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         metric="temperature",
     )
     iot.deactivate_sensor(user=admin, farm_id=farm_id, uid=sensor.uid)
@@ -501,6 +524,7 @@ def test_audit_failure_rolls_back_operation(admin, farm_id, monkeypatch, target,
     gateway, coordinator = _setup(admin, farm_id)
     iot.create_sensor(
         user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         metric="temperature",
     )
     before = (
@@ -543,6 +567,7 @@ def test_audit_payloads_contain_no_sensitive_keys(admin, farm_id):
     )
     iot.create_sensor(
         user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid),
         metric="temperature",
     )
     iot.deactivate_coordinator(user=admin, farm_id=farm_id, uid=coordinator.uid)
@@ -567,7 +592,8 @@ def test_writes_fail_closed_on_other_engines(admin, farm_id, monkeypatch, vendor
         lambda: iot.create_gateway(user=admin, farm_id=farm_id, name="X"),
         lambda: iot.create_coordinator(user=admin, farm_id=farm_id, name="X"),
         lambda: iot.create_sensor(
-            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+            user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid,
+            source_uid=make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid), channel=1,
             metric="temperature",
         ),
         lambda: iot.authorize_gateway(

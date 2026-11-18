@@ -151,7 +151,7 @@ function Get-FakeOverride {
 function New-FakeRenderedConfig {
     param($Ctx, $Override)
     $labels = Get-BaseLabels -RunId $Ctx.Names.RunId -InvocationId $Override.Invocation -OwnerProof $Override.Proof
-    $port = [ordered]@{ mode = "ingress"; host_ip = "127.0.0.1"; target = 3306; published = "3317"; protocol = "tcp" }
+    $port = [ordered]@{ mode = "ingress"; host_ip = "127.0.0.1"; target = 3306; published = [string]$Ctx.HostPort; protocol = "tcp" }
     $service = [ordered]@{
         container_name = $Ctx.Names.ContainerName; hostname = $Ctx.Names.ContainerHostname; image = $Override.Image
         labels = $labels; ports = @($port); networks = [ordered]@{ disposable = $null }
@@ -503,6 +503,21 @@ Describe "Parámetros y combinaciones" {
         $check.Ok | Should Be $true
         $check.Normalized.SettingsModule | Should BeExactly "config.settings_test_disposable_isolated"
     }
+
+    It "acepta el perfil IoT y conserva 3318 como puerto de host" {
+        $options = New-TestOptions @{
+            SqlMigrateOnly = $true
+            SettingsModule = "config.settings_test_disposable_iot"
+            SettingsModuleBound = $true
+        }
+        $check = Test-OrchestratorOptions -Options $options
+        $check.Ok | Should Be $true
+        $check.Normalized.SettingsModule | Should BeExactly "config.settings_test_disposable_iot"
+        $ctx = New-OrchestratorContext -Normalized $check.Normalized -Root $script:FakeRoot -RunId "0123456789ab" -InvocationId ("c" * 32) -OutputDirectory $options.OutputDirectory
+        $ctx.HostPort | Should Be 3318
+        $envMap = New-DockerChildEnvironment -Names $ctx.Names -DbPassword "db" -RootPassword "root" -HostPort $ctx.HostPort
+        $envMap["AGROTECH_DISPOSABLE_DB_HOST_PORT"] | Should BeExactly "3318"
+    }
 }
 
 Describe "Validación de -Tests" {
@@ -619,6 +634,11 @@ Describe "Entorno de procesos hijos" {
             $key | Should Not Match '^(COMPOSE_|DOCKER_|PYTEST_|PYTHON|DJANGO_|SMTP_|BREVO_|TEST_DB_|DB_|DATABASE_URL)'
         }
         $envMap["DISPOSABLE_DB_NAME"] | Should Be "agrotech_permtest_0123456789ab"
+    }
+
+    It "inyecta en Docker el puerto de host elegido para IoT" {
+        $envMap = New-DockerChildEnvironment -Names $names -DbPassword "db-secreto" -RootPassword "root-secreto" -Source $source -HostPort $script:SettingsModuleHostPorts[$script:IotSettingsModule]
+        $envMap["AGROTECH_DISPOSABLE_DB_HOST_PORT"] | Should BeExactly "3318"
     }
 
     It "Python recibe .env desactivado, correo vacío y la configuración autorizada" {
@@ -1443,6 +1463,7 @@ Describe "AUD-019: punto de entrada real (proceso aislado, sin Docker)" {
         @{ Name = "-SqlMigrateOnly"; Args = @("-SqlMigrateOnly"); Mode = "SqlMigrateOnly"; Settings = "config.settings_test_disposable_isolated"; Tests = "" },
         @{ Name = "sin switches"; Args = @(); Mode = "EnvironmentOnly"; Settings = "config.settings_test_disposable"; Tests = "" },
         @{ Name = "-Validate aislada"; Args = @("-Validate", "-SettingsModule", "config.settings_test_disposable_isolated", "-Tests", "apps/farms/tests"); Mode = "Validate"; Settings = "config.settings_test_disposable_isolated"; Tests = "apps\farms\tests" }
+        @{ Name = "-Validate IoT"; Args = @("-Validate", "-SettingsModule", "config.settings_test_disposable_iot", "-Tests", "apps/farms/tests"); Mode = "Validate"; Settings = "config.settings_test_disposable_iot"; Tests = "apps\farms\tests" }
     )
     foreach ($case in $valid) {
         It "transfiere las opciones y se detiene sin Docker ni Python (40): $($case.Name)" -Skip:(-not $dockerHidden) {
@@ -1816,12 +1837,25 @@ Describe "AUD-016: aislamiento y determinismo de Compose" {
     $names = Get-DisposableNames -Id "0123456789ab"
     $inv = "d1" * 16
     $proof = (Get-TestSecret -InvocationId $inv).Proof
-    $ctx = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest) }
+    $ctx = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest); HostPort = 3317 }
     $override = [pscustomobject]@{ Invocation = $inv; Proof = $proof; Image = ("mariadb:11.8.8@" + $TestDigest) }
 
     It "acepta la configuración renderizada esperada" {
         $script:Fake.ConfigMutator = $null
         Test-ComposeRenderedConfig -Json (New-FakeRenderedConfig -Ctx $ctx -Override $override) -Ctx $ctx | Should BeNullOrEmpty
+    }
+
+    It "acepta 3318 para IoT y rechaza los puertos prohibidos" {
+        $iotCtx = $ctx.Clone()
+        $iotCtx.HostPort = 3318
+        Test-ComposeRenderedConfig -Json (New-FakeRenderedConfig -Ctx $iotCtx -Override $override) -Ctx $iotCtx | Should BeNullOrEmpty
+        foreach ($port in @(3306, 3307, 3317)) {
+            $badCtx = $ctx.Clone()
+            $badCtx.HostPort = 3318
+            $script:Fake.ConfigMutator = { param($c) $c.services.mariadb.ports[0].published = [string]$port }
+            Test-ComposeRenderedConfig -Json (New-FakeRenderedConfig -Ctx $badCtx -Override $override) -Ctx $badCtx | Should Match "puerto de host desautorizado"
+        }
+        $script:Fake.ConfigMutator = $null
     }
 
     $mutations = [ordered]@{
@@ -2164,7 +2198,7 @@ Describe "F10.3.4-A: configuración renderizada con Redis" {
     $names = Get-DisposableNames -Id "0123456789ab"
     $inv = "d2" * 16
     $proof = (Get-TestSecret -InvocationId $inv).Proof
-    $ctx = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest); WithRedis = $true; RedisImageReference = ("redis:7.4.12@" + $TestRedisDigest) }
+    $ctx = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest); HostPort = 3317; WithRedis = $true; RedisImageReference = ("redis:7.4.12@" + $TestRedisDigest) }
     $override = [pscustomobject]@{ Invocation = $inv; Proof = $proof; Image = ("mariadb:11.8.8@" + $TestDigest); RedisImage = ("redis:7.4.12@" + $TestRedisDigest) }
     BeforeEach { $script:Fake = New-FakeDockerState }
 
@@ -2173,7 +2207,7 @@ Describe "F10.3.4-A: configuración renderizada con Redis" {
     }
 
     It "sin -WithRedis, un servicio redis se rechaza" {
-        $plain = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest) }
+        $plain = @{ Names = $names; InvocationId = $inv; OwnerProof = $proof; ImageReference = ("mariadb:11.8.8@" + $TestDigest); HostPort = 3317 }
         Test-ComposeRenderedConfig -Json (New-FakeRenderedConfig -Ctx $plain -Override $override) -Ctx $plain | Should Match "servicios inesperados"
     }
 
@@ -2412,3 +2446,43 @@ Describe "F10.3.4-A: integridad v2 y recuperación con Redis" {
         (Get-Content -LiteralPath $case.State -Raw -Encoding UTF8 | ConvertFrom-Json).Recovery.State | Should Be "RECOVERY_REFUSED"
     }
 }
+
+
+Describe "VALIDATION-02: cobertura de apps/iot (-CoverageIot)" {
+    $script:FakeRoot = New-FakeRoot -Base $TestDrive
+    $outside = Join-Path $TestDrive "salida-cobertura"
+    New-Item -ItemType Directory -Path $outside | Out-Null
+
+    It "solo se admite con -Validate" {
+        (Test-OrchestratorOptions -Options (New-TestOptions @{ CoverageIot = $true })).Ok | Should Be $false
+        (Test-OrchestratorOptions -Options (New-TestOptions @{ SqlMigrateOnly = $true; CoverageIot = $true })).Ok | Should Be $false
+        $ok = Test-OrchestratorOptions -Options (New-TestOptions @{ Validate = $true; CoverageIot = $true })
+        $ok.Ok | Should Be $true
+        $ok.Normalized.CoverageIot | Should Be $true
+    }
+
+    It "-CleanupOnly no admite -CoverageIot" {
+        (Test-OrchestratorOptions -Options @{ Root = $script:FakeRoot; CleanupOnly = $true; RunId = "0123456789ab"; StateFile = "C:\x.json"; CoverageIot = $true }).Ok | Should Be $false
+    }
+
+    It "sin -CoverageIot los argumentos de pytest no cambian" {
+        $ctx = @{ SettingsModule = "config.settings_test_disposable_iot"; OutputDirectory = $outside; Tests = @("apps\iot\tests") }
+        $list = @(Get-PytestArguments -Ctx $ctx)
+        @($list | Where-Object { $_ -like "--cov*" }).Count | Should Be 0
+    }
+
+    It "con -CoverageIot añade solo pytest-cov, conserva las protecciones y escribe fuera del repositorio" {
+        $ctx = @{ SettingsModule = "config.settings_test_disposable_iot"; OutputDirectory = $outside; Tests = @("apps\iot\tests"); CoverageIot = $true }
+        $list = @(Get-PytestArguments -Ctx $ctx)
+        ($list -join " ") | Should Match "-p config\.disposable_preflight -p no:cacheprovider -o addopts= --ds=config\.settings_test_disposable_iot --reuse-db --junitxml="
+        ($list -join " ") | Should Match "--cov=apps/iot --cov-branch --cov-config="
+        $list[$list.Count - 1] | Should Be "apps\iot\tests"
+        $rc = Join-Path $outside "coveragerc-iot"
+        Test-Path -LiteralPath $rc | Should Be $true
+        $text = Get-Content -LiteralPath $rc -Raw
+        $text | Should Match "branch = True"
+        $text | Should Match "apps/iot/tests/\*"
+        $text | Should Not Match "migrations"
+    }
+}
+

@@ -474,10 +474,15 @@ def test_authorized_settings_modules_whitelist():
             "config.settings_test",
             "config.settings_test_disposable",
             "config.settings_test_disposable_isolated",
+            "config.settings_test_disposable_iot",
         }
     )
     assert test_guard.DISPOSABLE_SETTINGS_MODULES == frozenset(
-        {"config.settings_test_disposable", "config.settings_test_disposable_isolated"}
+        {
+            "config.settings_test_disposable",
+            "config.settings_test_disposable_isolated",
+            "config.settings_test_disposable_iot",
+        }
     )
     assert test_guard.DISPOSABLE_SETTINGS_MODULES < test_guard.AUTHORIZED_SETTINGS_MODULES
 

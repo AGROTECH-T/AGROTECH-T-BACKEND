@@ -20,6 +20,7 @@ from apps.iot import services as iot
 from apps.iot.services import access
 from apps.iot.services.access import IOT_MANAGE_FORBIDDEN
 from apps.permissions.catalog import PERMISSION_CATALOG
+from apps.iot.tests.conftest import make_source_uid
 
 pytestmark = pytest.mark.django_db
 
@@ -35,8 +36,10 @@ def _error(callable_, status):
 def devices(admin, farm_id):
     gateway = iot.create_gateway(user=admin, farm_id=farm_id, name="G")
     coordinator = iot.create_coordinator(user=admin, farm_id=farm_id, name="C")
+    source_uid = make_source_uid(user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid)
     sensor = iot.create_sensor(
-        user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=1,
+        user=admin, farm_id=farm_id, coordinator_uid=coordinator.uid,
+        source_uid=source_uid, channel=1,
         metric="temperature",
     )
     return gateway, coordinator, sensor
@@ -47,7 +50,8 @@ def _writes(user, farm_id, gateway, coordinator, sensor):
         lambda: iot.create_gateway(user=user, farm_id=farm_id, name="X"),
         lambda: iot.create_coordinator(user=user, farm_id=farm_id, name="X"),
         lambda: iot.create_sensor(
-            user=user, farm_id=farm_id, coordinator_uid=coordinator.uid, channel=9,
+            user=user, farm_id=farm_id, coordinator_uid=coordinator.uid,
+            source_uid=sensor.source.uid, channel=9,
             metric="temperature",
         ),
         lambda: iot.authorize_gateway(
@@ -182,11 +186,11 @@ def _invalid_writes(user, farm_id, gateway, coordinator, sensor):
         (lambda: iot.create_coordinator(user=user, farm_id=farm_id, name="C",
                                         location_label="x" * 101), 400),
         (lambda: iot.create_sensor(user=user, farm_id=farm_id, coordinator_uid=coordinator.uid,
-                                   channel=-1, metric="temperature"), 400),
+                                   source_uid=sensor.source.uid, channel=-1, metric="temperature"), 400),
         (lambda: iot.create_sensor(user=user, farm_id=farm_id, coordinator_uid=coordinator.uid,
-                                   channel=2, metric="pressure"), 400),
+                                   source_uid=sensor.source.uid, channel=2, metric="pressure"), 400),
         (lambda: iot.create_sensor(user=user, farm_id=farm_id, coordinator_uid="malformado",
-                                   channel=2, metric="temperature"), 404),
+                                   source_uid=sensor.source.uid, channel=2, metric="temperature"), 404),
         (lambda: iot.authorize_gateway(user=user, farm_id=farm_id, coordinator_uid="x",
                                        gateway_uid=gateway.uid), 404),
         (lambda: iot.revoke_gateway_authorization(

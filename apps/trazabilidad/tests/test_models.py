@@ -49,6 +49,21 @@ def test_event_catalog_is_exact():
         "iot_sensor_reactivated",
         "iot_gateway_authorized",
         "iot_gateway_authorization_revoked",
+        "iot_gateway_credential_issued",
+        "iot_gateway_credential_rotated",
+        "iot_gateway_credential_revoked",
+        "iot_gateway_credential_compromised",
+        "iot_gateway_credential_cascade_revoked",
+        "iot_coordinator_credential_issued",
+        "iot_coordinator_credential_rotated",
+        "iot_coordinator_credential_revoked",
+        "iot_coordinator_credential_compromised",
+        "iot_coordinator_credential_cascade_revoked",
+        "iot_coordinator_credential_generation_exhausted",
+        "iot_broker_credential_registered",
+        "iot_broker_credential_confirmed",
+        "iot_broker_credential_activated",
+        "iot_broker_credential_revoked",
     ]
 
 

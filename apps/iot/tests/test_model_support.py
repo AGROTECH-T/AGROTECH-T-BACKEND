@@ -14,16 +14,29 @@ import pytest
 from django.db import models
 from django.db.migrations.loader import MigrationLoader
 
-from apps.iot.models import Coordinator, CoordinatorGateway, Gateway, Sensor
+from apps.iot.models import (
+    Coordinator,
+    CoordinatorGateway,
+    Gateway,
+    GatewayCredential,
+    Sensor,
+    SensorSource,
+)
 
 FKS_MODULE = importlib.import_module("apps.iot.migrations.0002_composite_farm_fks")
+SOURCE_FKS_MODULE = importlib.import_module("apps.iot.migrations.0010_sensor_source")
 
 REFERENCED_UNIQUES = {
     Gateway: ("iot_gateway_id_farm_uniq", ("id", "farm")),
     Coordinator: ("iot_coord_id_farm_uniq", ("id", "farm")),
+    SensorSource: ("iot_ss_id_coord_farm_uniq", ("id", "coordinator", "farm")),
 }
 REFERENCING_INDEXES = {
-    Sensor: {("coordinator", "farm"): "iot_sensor_coord_farm_idx"},
+    Sensor: {
+        ("coordinator", "farm"): "iot_sensor_coord_farm_idx",
+        ("source", "coordinator", "farm"): "iot_sn_source_fk_idx",
+    },
+    SensorSource: {("coordinator", "farm"): "iot_ss_coord_farm_idx"},
     CoordinatorGateway: {
         ("coordinator", "farm"): "iot_cg_coord_farm_idx",
         ("gateway", "farm"): "iot_cg_gw_farm_idx",
@@ -91,9 +104,47 @@ def test_composite_fks_point_to_tables_and_columns_of_the_models():
 
 
 def test_farm_and_device_relations_are_protected():
-    for model in (Gateway, Coordinator, Sensor, CoordinatorGateway):
+    for model in (Gateway, Coordinator, Sensor, SensorSource, CoordinatorGateway):
         assert model._meta.get_field("farm").remote_field.on_delete is models.PROTECT
     assert Sensor._meta.get_field("coordinator").remote_field.on_delete is models.PROTECT
+    assert Sensor._meta.get_field("source").remote_field.on_delete is models.PROTECT
+    assert SensorSource._meta.get_field("coordinator").remote_field.on_delete is models.PROTECT
     for field in ("coordinator", "gateway"):
         relation = CoordinatorGateway._meta.get_field(field).remote_field
         assert relation.on_delete is models.PROTECT
+    gateway = GatewayCredential._meta.get_field("gateway").remote_field
+    assert gateway.on_delete is models.PROTECT
+
+
+def test_source_fk_catalog_preserves_farm_and_coordinator_scope():
+    assert [
+        (spec.name, spec.table, spec.columns, spec.target_table, spec.target_columns)
+        for spec in SOURCE_FKS_MODULE.SOURCE_FKS
+    ] == [
+        (
+            "iot_ss_coord_farm_fk",
+            "iot_sensor_sources",
+            ("coordinator_id", "farm_id"),
+            "iot_coordinators",
+            ("id", "farm_id"),
+        ),
+        (
+            "iot_sensor_source_coord_farm_fk",
+            "iot_sensors",
+            ("source_id", "coordinator_id", "farm_id"),
+            "iot_sensor_sources",
+            ("id", "coordinator_id", "farm_id"),
+        ),
+    ]
+
+
+def test_legacy_source_relation_stays_nullable_in_model_and_migration_state():
+    assert Sensor._meta.get_field("source").null is True
+    state = MigrationLoader(None, ignore_no_migrations=True).project_state()
+    assert state.models[("iot", "sensor")].get_field("source").null is True
+
+
+def test_gateway_credential_has_no_secret_farm_or_expiry_fields():
+    names = {f.name for f in GatewayCredential._meta.get_fields()}
+    assert {"secret", "farm", "expires_at", "last_used_at"}.isdisjoint(names)
+    assert {"fingerprint", "key_version", "active_slot", "revocation_cause"} <= names
