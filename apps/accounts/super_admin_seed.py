@@ -1,11 +1,13 @@
 """Siembra las cuentas iniciales de la plataforma.
 
 Propósito: crear o actualizar los usuarios del archivo seeders al arrancar.
-Contexto: el superadmin nombra administradores; no crea fincas.
+Contexto: el superadmin nombra administradores; la finca demo se siembra
+después en ``apps.farms.seed_demo_farm``.
 @author Cristian Deysdayr Jimenez
 """
 from django.contrib.auth.hashers import make_password
 from django.db import transaction
+from django.utils import timezone
 from rest_framework.serializers import ValidationError
 
 from apps.accounts.models import User
@@ -23,11 +25,15 @@ class SeedSuperAdminError(ValueError):
 
 
 def seed_usuarios_iniciales() -> list[User]:
-    """Crea o actualiza todas las cuentas del archivo seeders.
+    """Crea o actualiza todas las cuentas del archivo seeders y la finca demo.
 
     @returns Cuentas sembradas en el mismo orden del archivo.
     """
-    return [seed_usuario(**datos) for datos in USUARIOS_INICIALES]
+    usuarios = [seed_usuario(**datos) for datos in USUARIOS_INICIALES]
+    from apps.farms.seed_demo_farm import seed_demo_farm
+
+    seed_demo_farm()
+    return usuarios
 
 
 def seed_super_admin(
@@ -104,6 +110,8 @@ def seed_usuario(
                 password_hash=make_password(clave),
                 is_superadmin=is_superadmin,
                 is_administrador=is_administrador,
+                email_verified=True,
+                email_verified_at=timezone.now(),
             )
         user.first_name = nombre
         user.last_name = apellido
@@ -113,6 +121,9 @@ def seed_usuario(
         user.is_active = True
         user.is_superadmin = is_superadmin
         user.is_administrador = is_administrador
+        if not user.email_verified:
+            user.email_verified = True
+            user.email_verified_at = timezone.now()
         user.save()
         return user
 
