@@ -26,7 +26,9 @@ def listar_personas(actor: User, search: str = "") -> dict:
     return {
         "puedo_asignar": True,
         "fincas": list(
-            Farm.objects.filter(id__in=farm_ids).values("id", "name").order_by("id")
+            Farm.objects.filter(id__in=farm_ids)
+            .values("id", "name", "is_active")
+            .order_by("id")
         ),
         "usuarios": _agrupar(actor, farm_ids, search=search),
     }
@@ -42,18 +44,23 @@ def detalle_persona(*, actor: User, user_id: int) -> dict:
 
 
 def cambiar_rol(*, actor: User, user_id: int, farm_id: int, role: str) -> dict:
-    """Cambia el rol de otra persona en una finca administrada."""
+    """Cambia el rol de una persona en una finca administrada.
+
+    El administrador puede cambiar también su propio rol; la finca no puede
+    quedarse sin un administrador activo (``_conservar_administrador``).
+    """
     if role not in FarmRole.values:
         raise AppError("el rol no es válido", 400)
     if not _es_administrador(actor, farm_id):
         _rechazar_finca(actor, farm_id)
-    if actor.id == user_id:
-        raise AppError("no puedes cambiar tu propio rol", 403)
     membership = _membresia(user_id, farm_id)
     _conservar_administrador(membership, role)
     membership.role = role
     membership.save(update_fields=["role"])
     farm_ids = _fincas_administradas(actor)
+    if actor.id == user_id and farm_id not in farm_ids:
+        # Tras bajarse de administrador, la ficha ya no sale por fincas admin.
+        return _ficha_detalle(actor, membership.user, [farm_id])
     person = _persona(actor, farm_ids, user_id)
     return _ficha_detalle(actor, person, farm_ids)
 
