@@ -18,9 +18,11 @@ VER_REPORTES = "ver_reportes"
 VER_GALPON = "ver_galpon"
 REGISTRAR_GALPON = "registrar_galpon"
 CERRAR_CICLO = "cerrar_ciclo"
+VER_IOT = "ver_iot"
+GESTIONAR_IOT = "gestionar_iot"
 
 PERMISOS_POR_ROL = {
-    FarmRole.CONSULTA: frozenset({VER_INVENTARIO, VER_REPORTES, VER_GALPON}),
+    FarmRole.CONSULTA: frozenset({VER_INVENTARIO, VER_REPORTES, VER_GALPON, VER_IOT}),
     FarmRole.OPERADOR: frozenset(
         {
             VER_INVENTARIO,
@@ -30,6 +32,7 @@ PERMISOS_POR_ROL = {
             VER_GALPON,
             REGISTRAR_GALPON,
             CERRAR_CICLO,
+            VER_IOT,
         }
     ),
     FarmRole.ADMINISTRADOR: frozenset(
@@ -43,6 +46,8 @@ PERMISOS_POR_ROL = {
             VER_GALPON,
             REGISTRAR_GALPON,
             CERRAR_CICLO,
+            VER_IOT,
+            GESTIONAR_IOT,
         }
     ),
 }
@@ -56,6 +61,7 @@ _IDS_ASIGNABLES = (
     GESTIONAR_PRODUCTOS,
     REGISTRAR_GALPON,
     CERRAR_CICLO,
+    GESTIONAR_IOT,
 )
 
 PERMISOS_ASIGNABLES = tuple(

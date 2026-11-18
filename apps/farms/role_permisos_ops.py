@@ -110,4 +110,27 @@ PERMISOS_OPS = (
             CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo lectura."},
         },
     },
+    {
+        "id": "ver_iot",
+        "nombre": "Consultar sensores y lecturas IoT",
+        "modulo": "IoT",
+        "por_rol": {
+            ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Dispositivos, sensores y mediciones."},
+            OPERADOR: {"estado": PERMITIDO, "detalle": "Dispositivos, sensores y mediciones."},
+            CONSULTA: {"estado": PERMITIDO, "detalle": "Dispositivos, sensores y mediciones."},
+        },
+    },
+    {
+        "id": "gestionar_iot",
+        "nombre": "Registrar y administrar dispositivos IoT",
+        "modulo": "IoT",
+        "por_rol": {
+            ADMINISTRADOR: {
+                "estado": PERMITIDO,
+                "detalle": "Gateways, coordinadores, credenciales y sensores.",
+            },
+            OPERADOR: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+            CONSULTA: {"estado": NO_PERMITIDO, "detalle": "Solo el administrador."},
+        },
+    },
 )
