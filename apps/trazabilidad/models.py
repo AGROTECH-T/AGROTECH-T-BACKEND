@@ -62,12 +62,80 @@ class EventType(models.TextChoices):
         "iot_gateway_authorization_revoked",
         "Autorización de coordinador en gateway revocada",
     )
+    # IoT-03.1: credenciales de gateway. Nunca el secreto ni su huella.
+    IOT_GATEWAY_CREDENTIAL_ISSUED = (
+        "iot_gateway_credential_issued",
+        "Credencial de gateway emitida",
+    )
+    IOT_GATEWAY_CREDENTIAL_ROTATED = (
+        "iot_gateway_credential_rotated",
+        "Credencial de gateway rotada",
+    )
+    IOT_GATEWAY_CREDENTIAL_REVOKED = (
+        "iot_gateway_credential_revoked",
+        "Credencial de gateway revocada",
+    )
+    IOT_GATEWAY_CREDENTIAL_COMPROMISED = (
+        "iot_gateway_credential_compromised",
+        "Credencial de gateway revocada por compromiso",
+    )
+    IOT_GATEWAY_CREDENTIAL_CASCADE_REVOKED = (
+        "iot_gateway_credential_cascade_revoked",
+        "Credencial de gateway revocada por desactivación del gateway",
+    )
+    # IoT-03.2: credenciales de coordinador. Nunca la clave, el ciphertext ni el
+    # nonce. ``iot_coordinator_credential_cascade_revoked`` mide 42 caracteres,
+    # por eso ``event_type`` admite hasta 48.
+    IOT_COORDINATOR_CREDENTIAL_ISSUED = (
+        "iot_coordinator_credential_issued",
+        "Credencial de coordinador emitida",
+    )
+    IOT_COORDINATOR_CREDENTIAL_ROTATED = (
+        "iot_coordinator_credential_rotated",
+        "Credencial de coordinador rotada",
+    )
+    IOT_COORDINATOR_CREDENTIAL_REVOKED = (
+        "iot_coordinator_credential_revoked",
+        "Credencial de coordinador revocada",
+    )
+    IOT_COORDINATOR_CREDENTIAL_COMPROMISED = (
+        "iot_coordinator_credential_compromised",
+        "Credencial de coordinador revocada por compromiso",
+    )
+    IOT_COORDINATOR_CREDENTIAL_CASCADE_REVOKED = (
+        "iot_coordinator_credential_cascade_revoked",
+        "Credencial de coordinador revocada por desactivación",
+    )
+    IOT_COORDINATOR_CREDENTIAL_GENERATION_EXHAUSTED = (
+        "iot_coordinator_credential_generation_exhausted",
+        "Generación de credencial de coordinador agotada",
+    )
+    # FLESPI-01: credenciales de broker (proveedor MQTT externo). Nunca el
+    # secreto, su huella ni el ``token_id`` del proveedor. Confirmar (el
+    # proveedor la habilitó) y activar (Django la declara vigente) son eventos
+    # distintos: durante una rotación se confirma sin activar.
+    IOT_BROKER_CREDENTIAL_REGISTERED = (
+        "iot_broker_credential_registered",
+        "Credencial de broker registrada",
+    )
+    IOT_BROKER_CREDENTIAL_CONFIRMED = (
+        "iot_broker_credential_confirmed",
+        "Credencial de broker confirmada por el proveedor",
+    )
+    IOT_BROKER_CREDENTIAL_ACTIVATED = (
+        "iot_broker_credential_activated",
+        "Credencial de broker activada",
+    )
+    IOT_BROKER_CREDENTIAL_REVOKED = (
+        "iot_broker_credential_revoked",
+        "Credencial de broker revocada",
+    )
 
 
 class AuditEvent(models.Model):
     """Registro inmutable de un evento de negocio."""
 
-    event_type = models.CharField(max_length=40, choices=EventType.choices)
+    event_type = models.CharField(max_length=48, choices=EventType.choices)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     farm = models.ForeignKey(

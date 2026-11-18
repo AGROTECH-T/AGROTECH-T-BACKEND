@@ -34,3 +34,39 @@ def require_mariadb(using: str = DEFAULT_DB_ALIAS) -> None:
         raise ImproperlyConfigured(MARIADB_REQUIRED_MESSAGE)
     if getattr(connection, "mysql_is_mariadb", False) is not True:
         raise ImproperlyConfigured(MARIADB_REQUIRED_MESSAGE)
+
+
+READ_COMMITTED = "read committed"
+# Django's MySQL/MariaDB default when OPTIONS has no ``isolation_level``
+# (django/db/backends/mysql/base.py, get_connection_params).
+DJANGO_MYSQL_DEFAULT_ISOLATION = "read committed"
+READ_COMMITTED_REQUIRED_MESSAGE = (
+    "la identidad del broker IoT requiere aislamiento READ COMMITTED en MariaDB"
+)
+
+
+def effective_isolation_level(using: str = DEFAULT_DB_ALIAS) -> str | None:
+    """Aislamiento que Django aplicará a la conexión ``using`` (sin abrirla).
+
+    BUILD-FLEPSI-02K (K-H1). Fuera de MySQL/MariaDB devuelve ``None``.
+    """
+    connection = connections[using]
+    if connection.vendor != "mysql":
+        return None
+    options = connection.settings_dict.get("OPTIONS") or {}
+    level = options.get("isolation_level", DJANGO_MYSQL_DEFAULT_ISOLATION)
+    return str(level).strip().lower() if level else None
+
+
+def require_read_committed(using: str = DEFAULT_DB_ALIAS) -> None:
+    """Falla cerrado si la conexión MariaDB no usará READ COMMITTED.
+
+    La deduplicación y los límites de identidad del broker comprueban
+    existencia/recuento después de bloquear la fila de la entrega; con
+    REPEATABLE READ una lectura previa fijaría una instantánea antigua y
+    podría duplicar diagnósticos o superar límites. No consulta la base: lee
+    la configuración efectiva que Django usará al abrir la conexión.
+    """
+    level = effective_isolation_level(using)
+    if level is not None and level != READ_COMMITTED:
+        raise ImproperlyConfigured(READ_COMMITTED_REQUIRED_MESSAGE)

@@ -22,7 +22,7 @@ from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.iot.catalog import is_known_metric, metric_unit
 from apps.iot.identifiers import IdentifierKind
-from apps.iot.models import Coordinator, Sensor
+from apps.iot.models import Coordinator, Sensor, SensorSource
 from apps.iot.services._common import (
     audit,
     clean_reason,
@@ -41,6 +41,7 @@ INVALID_METRIC = "métrica no válida"
 INVALID_CHANNEL = "canal no válido"
 CHANNEL_IN_USE = "ya hay un sensor activo en ese canal del coordinador"
 COORDINATOR_INACTIVE = "el coordinador está desactivado"
+SOURCE_REQUIRED = "la fuente física es obligatoria"
 ALREADY_INACTIVE = "el sensor ya está desactivado"
 ALREADY_ACTIVE = "el sensor ya está activo"
 CHANNEL_FIELD_TYPE = "PositiveSmallIntegerField"
@@ -51,7 +52,7 @@ def list_sensors(
 ):
     """Sensores de la finca, opcionalmente de un coordinador."""
     require_read_membership(user=user, farm_id=farm_id)
-    queryset = Sensor.objects.filter(farm_id=farm_id).select_related("coordinator")
+    queryset = Sensor.objects.filter(farm_id=farm_id).select_related("coordinator", "source")
     if coordinator_uid is not None:
         uid = parse_uid(coordinator_uid, IdentifierKind.COORDINATOR, COORDINATOR_NOT_FOUND)
         queryset = queryset.filter(coordinator__uid=uid)
@@ -64,7 +65,9 @@ def get_sensor(*, user: User, farm_id: int, uid: str) -> Sensor:
     """Sensor de la finca o 404."""
     require_read_membership(user=user, farm_id=farm_id)
     uid = parse_uid(uid, IdentifierKind.SENSOR, SENSOR_NOT_FOUND)
-    sensor = Sensor.objects.filter(farm_id=farm_id, uid=uid).select_related("coordinator").first()
+    sensor = Sensor.objects.filter(farm_id=farm_id, uid=uid).select_related(
+        "coordinator", "source"
+    ).first()
     if sensor is None:
         raise AppError(SENSOR_NOT_FOUND, 404)
     return sensor
@@ -76,9 +79,9 @@ def sensor_unit(sensor: Sensor) -> str:
 
 
 def create_sensor(
-    *, user: User, farm_id: int, coordinator_uid: str, channel, metric
+    *, user: User, farm_id: int, coordinator_uid: str, channel, metric, source_uid=None
 ) -> Sensor:
-    """Registra un sensor activo en un canal libre de un coordinador activo."""
+    """Registra un sensor lógico en un canal libre y fuente física activa."""
     with transaction.atomic():
         membership = lock_manage_membership(user=user, farm_id=farm_id)
         coordinator_uid = parse_uid(
@@ -92,12 +95,18 @@ def create_sensor(
         )
         if not coordinator.is_active:
             raise AppError(COORDINATOR_INACTIVE, 409)
+        if source_uid is None:
+            raise AppError(SOURCE_REQUIRED, 400)
+        source = _lock_source_for_sensor(
+            source_uid=source_uid, coordinator=coordinator, farm_id=membership.farm_id
+        )
         try:
             sensor = create_with_uid(
                 Sensor,
                 IdentifierKind.SENSOR,
                 farm_id=membership.farm_id,
                 coordinator=coordinator,
+                source=source,
                 channel=clean_channel,
                 metric=metric,
                 active_channel=clean_channel,
@@ -231,6 +240,24 @@ def _lock_sensor_coordinator(*, farm_id: int, uid: str) -> Coordinator:
     return Coordinator.objects.select_for_update().get(pk=coordinator_id, farm_id=farm_id)
 
 
+def _lock_source_for_sensor(*, source_uid, coordinator: Coordinator, farm_id: int) -> SensorSource:
+    """Validate source scope and activity under the coordinator lock."""
+    from uuid import UUID
+
+    try:
+        uid = source_uid if isinstance(source_uid, UUID) else UUID(str(source_uid))
+    except (TypeError, ValueError, AttributeError):
+        raise AppError("fuente física no encontrada", 404) from None
+    source = SensorSource.objects.select_for_update().filter(
+        uid=uid, coordinator=coordinator, farm_id=farm_id
+    ).first()
+    if source is None:
+        raise AppError("fuente física no encontrada", 404)
+    if not source.is_active:
+        raise AppError("la fuente física está desactivada", 409)
+    return source
+
+
 def _lock_sensor(*, farm_id: int, uid: str, coordinator: Coordinator) -> Sensor:
     sensor = lock_by_uid(Sensor, farm_id=farm_id, uid=uid, not_found=SENSOR_NOT_FOUND)
     sensor.coordinator = coordinator
@@ -259,6 +286,7 @@ def _snapshot(sensor: Sensor) -> dict:
     return {
         "uid": sensor.uid,
         "coordinator_uid": sensor.coordinator.uid,
+        "source_uid": str(sensor.source.uid) if sensor.source_id else None,
         "channel": sensor.channel,
         "metric": sensor.metric,
         "is_active": sensor.is_active,

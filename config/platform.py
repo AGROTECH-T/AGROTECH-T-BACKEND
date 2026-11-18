@@ -109,6 +109,25 @@ FRONTEND_URL = normalize_frontend_url(os.getenv("FRONTEND_URL"), debug=DEBUG)
 # forma cerrada al usarla si falta.
 INVITATION_CODE_HMAC_KEY = os.getenv("INVITATION_CODE_HMAC_KEY", "")
 
+# Clave HMAC independiente de las huellas de credenciales de gateway (IoT-03.1).
+# Sin valor por defecto ni alternativa. config.settings la valida al arrancar en
+# producción (config.gateway_credential_key); apps.iot.gateway_credentials
+# falla de forma cerrada al usarla si falta.
+GATEWAY_CREDENTIAL_HMAC_KEY = os.getenv("GATEWAY_CREDENTIAL_HMAC_KEY", "")
+
+# Clave maestra AES-256-GCM de las claves HMAC de coordinador (IoT-03.2).
+# Base64 de exactamente 32 bytes; sin valor por defecto ni alternativa con
+# SECRET_KEY. La versión vigente y las históricas se publican aparte. En
+# producción se valida al arrancar (config.coordinator_key_encryption_key); en
+# desarrollo y pruebas los servicios fallan cerrados al usarla.
+COORDINATOR_KEY_ENCRYPTION_KEY = os.getenv("COORDINATOR_KEY_ENCRYPTION_KEY", "")
+COORDINATOR_KEY_ENCRYPTION_KEY_VERSION = os.getenv(
+    "COORDINATOR_KEY_ENCRYPTION_KEY_VERSION", "1"
+)
+COORDINATOR_KEY_ENCRYPTION_KEY_PREVIOUS = os.getenv(
+    "COORDINATOR_KEY_ENCRYPTION_KEY_PREVIOUS", ""
+)
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,

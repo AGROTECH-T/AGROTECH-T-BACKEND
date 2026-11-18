@@ -34,14 +34,17 @@ import json
 import os
 import re
 import sys
+import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
 ALLOWED_SETTINGS_MODULES = (
     "config.settings_test_disposable",
     "config.settings_test_disposable_isolated",
+    "config.settings_test_disposable_iot",
 )
 ISOLATED_SETTINGS_MODULE = "config.settings_test_disposable_isolated"
+IOT_SETTINGS_MODULE = "config.settings_test_disposable_iot"
 EXPLICIT_PROTECTED_DATABASES = frozenset({"agrotech_db", "agrotech_t"})
 EXPECTED_ENGINE = "django.db.backends.mysql"
 EXPECTED_STORAGE_ENGINE = "innodb"
@@ -68,6 +71,7 @@ REQUIRED_SCHEMA_PRIVILEGES = frozenset(
         "INDEX",
         "DROP",
         "REFERENCES",
+        "TRIGGER",
     }
 )
 
@@ -508,13 +512,18 @@ def expected_identity(settings_module: str, run_id: str) -> ExpectedIdentity:
     """Deriva la identidad esperada de las constantes de la guarda existente."""
     import config.settings_test_disposable as guard
 
+    host_port = guard.DEFAULT_TEST_DB_PORT
+    if settings_module == IOT_SETTINGS_MODULE:
+        from config.settings_test_disposable_iot import IOT_TEST_DB_PORT
+
+        host_port = IOT_TEST_DB_PORT
     return ExpectedIdentity(
         settings_module=settings_module,
         run_id=run_id,
         database=guard.disposable_database_name(run_id),
         user=guard.EXPECTED_TEST_DB_USER,
         host=guard.DEFAULT_TEST_DB_HOST,
-        port=guard.DEFAULT_TEST_DB_PORT,
+        port=str(host_port),
         server_port=guard.EXPECTED_SERVER_PORT,
         hostname=guard.disposable_container_hostname(run_id),
         protected=frozenset(guard.PROTECTED_DATABASES) | EXPLICIT_PROTECTED_DATABASES,
@@ -663,6 +672,18 @@ def _isolated_validators(connection, mode: str) -> None:
         validate_isolated_tables(connection)
 
 
+def _iot_validators(connection, mode: str) -> None:
+    from config.settings_test_disposable_iot import (
+        validate_iot_migrations,
+        validate_iot_tables,
+    )
+
+    validate_iot_migrations()
+    if mode == SCHEMA_MIGRATED:
+        validate_iot_migrations(connection)
+        validate_iot_tables(connection)
+
+
 def check_disposable_redis() -> None:
     """Caché configurada y Redis real de la ejecución (F10.3.4-A).
 
@@ -691,6 +712,61 @@ def _classify_import_error(message: str) -> str:
     return STATUS_PROTECTED_DATABASE if "protegida" in message else STATUS_CONFIG_NOT_ALLOWED
 
 
+SECRET_ENV_VARS = (
+    "SMTP_PASSWORD",
+    "SMTP_USER",
+    "SMTP_FROM",
+    "BREVO_API_KEY",
+    "DJANGO_SECRET_KEY",
+    "MYSQL_ROOT_PASSWORD",
+    "MARIADB_ROOT_PASSWORD",
+)
+SECRET_KEY_PATTERN = re.compile(
+    r"(?i)(password|passwd|pwd|secret|token|api[_-]?key)(\s*[=:]\s*)(\S+)"
+)
+
+
+def _secret_values() -> list[str]:
+    """Valores sensibles usados solo para redactar; nunca se persisten."""
+    values = []
+    for name in SECRET_ENV_VARS:
+        value = os.environ.get(name)
+        if value and len(value) >= 4:
+            values.append(value)
+    try:
+        from django.conf import settings
+
+        secret_key = getattr(settings, "SECRET_KEY", "") or ""
+        if len(secret_key) >= 4:
+            values.append(secret_key)
+        database = (settings.DATABASES or {}).get("default") or {}
+        for key in ("PASSWORD", "USER"):
+            value = database.get(key)
+            if value and len(str(value)) >= 4:
+                values.append(str(value))
+    except Exception:  # noqa: BLE001
+        pass
+    return values
+
+
+def _redact(text: str) -> str:
+    """Quita credenciales conocidas y pares clave=valor antes de persistir."""
+    for value in _secret_values():
+        text = text.replace(value, "***")
+    return SECRET_KEY_PATTERN.sub(r"\1\2***", text)
+
+
+def _exception_report(exc: BaseException) -> dict:
+    """Detalle redactado de la excepción para diagnóstico sin secretos."""
+    trace = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+    return {
+        "ok": False,
+        "error": type(exc).__name__,
+        "message": _redact(str(exc))[:2000],
+        "traceback": _redact(trace).splitlines()[-80:],
+    }
+
+
 def _configure_django(settings_module: str) -> dict:
     """Carga la configuración autorizada, fuerza el backend local y arranca Django."""
     import django
@@ -714,8 +790,19 @@ def _live_preflight(settings_module: str, run_id: str, mode: str) -> PreflightRe
     import config.settings_test_disposable as base_guard
 
     guard = base_guard
+    live_validator = base_guard.validate_live_disposable_database
+    isolated_validators = None
     if settings_module == ISOLATED_SETTINGS_MODULE:
         import config.settings_test_disposable_isolated as guard
+        static_validator = guard.validate_disposable_environment
+        isolated_validators = _isolated_validators
+    elif settings_module == IOT_SETTINGS_MODULE:
+        import config.settings_test_disposable_iot as guard
+        static_validator = guard.validate_disposable_environment
+        live_validator = guard.validate_live_iot_disposable_database
+        isolated_validators = _iot_validators
+    else:
+        static_validator = guard.validate_disposable_environment
     mail_settings = {
         "EMAIL_BACKEND": settings.EMAIL_BACKEND,
         "EMAIL_HOST": settings.EMAIL_HOST,
@@ -734,11 +821,9 @@ def _live_preflight(settings_module: str, run_id: str, mode: str) -> PreflightRe
         environ=os.environ,
         mail_settings=mail_settings,
         guards_installed=mail_guard_report()["installed"],
-        static_validator=guard.validate_disposable_environment,
-        live_validator=base_guard.validate_live_disposable_database,
-        isolated_validators=(
-            _isolated_validators if settings_module == ISOLATED_SETTINGS_MODULE else None
-        ),
+        static_validator=static_validator,
+        live_validator=live_validator,
+        isolated_validators=isolated_validators,
         redis_validator=(
             check_disposable_redis if base_guard.disposable_redis_enabled() else None
         ),
@@ -812,9 +897,12 @@ def main(argv=None) -> int:
             if args.command == "migrate":
                 call_command("migrate", interactive=False, verbosity=1)
             else:
-                call_command("sqlmigrate", "trazabilidad", "0007")
+                if args.settings_module == IOT_SETTINGS_MODULE:
+                    call_command("sqlmigrate", "iot", "0013")
+                else:
+                    call_command("sqlmigrate", "trazabilidad", "0007")
         except Exception as exc:  # noqa: BLE001
-            payload["operation"] = {"ok": False, "error": type(exc).__name__}
+            payload["operation"] = _exception_report(exc)
             return finish(EXIT_CODES["MIGRATION_FAILED"], payload)
         payload["operation"] = {"ok": True}
 

@@ -5,12 +5,13 @@ coordinadores de una finca.
 
 Reglas:
 - Solo el administrador de la finca escribe (``access.lock_manage_membership``).
-- Desactivar un gateway revoca sus autorizaciones vigentes.
-- Desactivar un coordinador revoca sus autorizaciones vigentes y desactiva sus
-  sensores activos.
+- Desactivar un gateway revoca sus autorizaciones vigentes y su credencial
+  (IoT-03.1).
+- Desactivar un coordinador revoca sus autorizaciones vigentes, sus credenciales
+  (IoT-03.2) y desactiva sus sensores activos.
 - Reactivar es un procedimiento administrativo controlado: exige motivo, queda
-  auditado y **no** restaura autorizaciones ni sensores; hay que volver a
-  autorizar y reactivar cada sensor explícitamente.
+  auditado y **no** restaura autorizaciones, sensores ni credenciales; hay que
+  volver a autorizar, reactivar cada sensor y emitir una credencial nueva.
 - La finca de un dispositivo nunca cambia.
 """
 from django.db import transaction
@@ -20,7 +21,13 @@ from apps.accounts.errors import AppError
 from apps.accounts.models import User
 from apps.iot.identifiers import IdentifierKind
 from apps.iot.models import LOCATION_LABEL_MAX_LENGTH, NAME_MAX_LENGTH, Coordinator, Gateway
-from apps.iot.services import authorizations, sensors
+from apps.iot.services import (
+    authorizations,
+    broker_credentials,
+    coordinator_credentials,
+    credentials,
+    sensors,
+)
 from apps.iot.services._common import (
     audit,
     clean_reason,
@@ -46,7 +53,11 @@ CAUSE_COORDINATOR_DEACTIVATED = "coordinator_deactivated"
 class _DeviceSpec:
     """Diferencias entre gateway y coordinador para los casos de uso comunes."""
 
-    def __init__(self, model, kind, entity_type, not_found, created, deactivated, reactivated):
+    def __init__(
+        self, model, kind, entity_type, not_found, created, deactivated, reactivated,
+        restored_metadata,
+    ):
+        self.restored_metadata = restored_metadata
         self.model = model
         self.kind = kind
         self.entity_type = entity_type
@@ -64,6 +75,7 @@ GATEWAY = _DeviceSpec(
     EventType.IOT_GATEWAY_CREATED,
     EventType.IOT_GATEWAY_DEACTIVATED,
     EventType.IOT_GATEWAY_REACTIVATED,
+    {"restored_authorizations": 0, "restored_sensors": 0, "restored_gwcreds": 0},
 )
 COORDINATOR = _DeviceSpec(
     Coordinator,
@@ -73,6 +85,7 @@ COORDINATOR = _DeviceSpec(
     EventType.IOT_COORDINATOR_CREATED,
     EventType.IOT_COORDINATOR_DEACTIVATED,
     EventType.IOT_COORDINATOR_REACTIVATED,
+    {"restored_authorizations": 0, "restored_sensors": 0, "restored_coordcreds": 0},
 )
 
 
@@ -137,6 +150,15 @@ def deactivate_gateway(*, user: User, farm_id: int, uid: str, reason=None) -> Ga
                 cause=CAUSE_GATEWAY_DEACTIVATED,
             )
             revoked += 1
+        revoked_credentials = credentials.revoke_for_deactivated_gateway(
+            membership=membership, user=user, gateway=gateway, now=now, reason=clean
+        )
+        # FLESPI-01: revocación local de las credenciales de broker (pendiente y
+        # activa), con su propio evento por credencial. No llama al proveedor.
+        # Orden: Gateway -> credenciales de gateway -> credenciales de broker.
+        broker_credentials.revoke_broker_credentials_for_deactivated_gateway(
+            membership=membership, user=user, gateway=gateway, now=now, reason=clean
+        )
         _deactivate(
             GATEWAY,
             gateway,
@@ -144,7 +166,10 @@ def deactivate_gateway(*, user: User, farm_id: int, uid: str, reason=None) -> Ga
             user=user,
             now=now,
             reason=clean,
-            metadata={"revoked_authorizations": revoked},
+            metadata={
+                "revoked_authorizations": revoked,
+                "revoked_gwcreds": revoked_credentials,
+            },
         )
         return gateway
 
@@ -180,6 +205,9 @@ def deactivate_coordinator(*, user: User, farm_id: int, uid: str, reason=None) -
             reason=clean,
             cause=CAUSE_COORDINATOR_DEACTIVATED,
         )
+        revoked_credentials = coordinator_credentials.revoke_for_deactivated_coordinator(
+            membership=membership, user=user, coordinator=coordinator, now=now, reason=clean
+        )
         _deactivate(
             COORDINATOR,
             coordinator,
@@ -190,6 +218,7 @@ def deactivate_coordinator(*, user: User, farm_id: int, uid: str, reason=None) -
             metadata={
                 "revoked_authorizations": revoked,
                 "deactivated_sensors": deactivated_sensors,
+                "revoked_coordcreds": revoked_credentials,
             },
         )
         return coordinator
@@ -290,7 +319,7 @@ def _reactivate(spec: _DeviceSpec, *, user, farm_id, uid, reason):
             before=before,
             after=_snapshot(device),
             reason=clean,
-            metadata={"restored_authorizations": 0, "restored_sensors": 0},
+            metadata=spec.restored_metadata,
         )
         return device
 

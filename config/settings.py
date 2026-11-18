@@ -11,7 +11,11 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 
 from config import platform
+from config.coordinator_key_encryption_key import (
+    validate_coordinator_master_key,
+)
 from config.database import database
+from config.gateway_credential_key import resolve_gateway_credential_key
 from config.invitation_code_key import resolve_invitation_code_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -109,6 +113,23 @@ FRONTEND_URL = platform.FRONTEND_URL
 # en desarrollo y pruebas el servicio falla de forma cerrada al usarla si falta.
 INVITATION_CODE_HMAC_KEY = resolve_invitation_code_key(
     platform.INVITATION_CODE_HMAC_KEY, debug=DEBUG, secret_key=SECRET_KEY
+)
+# IoT-03.1: misma política para la clave de credenciales de gateway.
+GATEWAY_CREDENTIAL_HMAC_KEY = resolve_gateway_credential_key(
+    platform.GATEWAY_CREDENTIAL_HMAC_KEY, debug=DEBUG, secret_key=SECRET_KEY
+)
+# IoT-03.2: clave maestra de cifrado (AES-256-GCM) de las claves de coordinador.
+# Obligatoria y validada al arrancar en producción (DEBUG=False); en desarrollo y
+# pruebas los servicios fallan de forma cerrada al usarla si falta o no vale.
+COORDINATOR_KEY_ENCRYPTION_KEY = platform.COORDINATOR_KEY_ENCRYPTION_KEY
+COORDINATOR_KEY_ENCRYPTION_KEY_VERSION = platform.COORDINATOR_KEY_ENCRYPTION_KEY_VERSION
+COORDINATOR_KEY_ENCRYPTION_KEY_PREVIOUS = platform.COORDINATOR_KEY_ENCRYPTION_KEY_PREVIOUS
+validate_coordinator_master_key(
+    raw_key=COORDINATOR_KEY_ENCRYPTION_KEY,
+    raw_version=COORDINATOR_KEY_ENCRYPTION_KEY_VERSION,
+    raw_previous=COORDINATOR_KEY_ENCRYPTION_KEY_PREVIOUS,
+    debug=DEBUG,
+    secret_key=SECRET_KEY,
 )
 LOGGING = platform.LOGGING
 PASSWORD_HASHERS = platform.PASSWORD_HASHERS

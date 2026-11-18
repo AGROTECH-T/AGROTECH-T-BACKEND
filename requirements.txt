@@ -12,3 +12,4 @@ argon2-cffi>=25,<26
 requests>=2.32,<3
 python-dotenv>=1.1,<2
 gunicorn>=23,<24
+paho-mqtt>=2.1,<3

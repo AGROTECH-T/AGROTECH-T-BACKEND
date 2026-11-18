@@ -44,45 +44,52 @@ restricción antes de reintentar.
 """
 from django.db import migrations
 
+from apps.iot.migrations._composite_fk import (
+    ForeignKeySpec,
+    add_foreign_keys,
+    drop_foreign_keys,
+)
+from apps.iot.migrations._composite_fk import (
+    expected_definition as _expected_definition,
+)
+from apps.iot.migrations._composite_fk import (
+    fk_definition as _fk_definition,
+)
+
 COMPOSITE_FKS = (
     ("iot_sensor_coord_farm_fk", "iot_sensors", "coordinator_id", "iot_coordinators"),
     ("iot_cg_coord_farm_fk", "iot_coordinator_gateways", "coordinator_id", "iot_coordinators"),
     ("iot_cg_gw_farm_fk", "iot_coordinator_gateways", "gateway_id", "iot_gateways"),
 )
 SUPPORTED_VENDORS = frozenset({"mysql", "postgresql"})
-# Consultas fijas por motor, limitadas al esquema actual, a la tabla y al nombre.
-FK_EXISTS_SQL = {
-    "mysql": (
-        "SELECT COUNT(*) FROM information_schema.TABLE_CONSTRAINTS "
-        "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = %s "
-        "AND CONSTRAINT_NAME = %s AND CONSTRAINT_TYPE = 'FOREIGN KEY'"
-    ),
-    "postgresql": (
-        "SELECT COUNT(*) FROM information_schema.table_constraints "
-        "WHERE constraint_schema = current_schema() AND table_name = %s "
-        "AND constraint_name = %s AND constraint_type = 'FOREIGN KEY'"
-    ),
-}
-FK_COLUMNS_SQL = {
-    "mysql": (
-        "SELECT COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME "
-        "FROM information_schema.KEY_COLUMN_USAGE "
-        "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = %s "
-        "AND CONSTRAINT_NAME = %s ORDER BY ORDINAL_POSITION"
-    ),
-    "postgresql": (
-        "SELECT column_name FROM information_schema.key_column_usage "
-        "WHERE constraint_schema = current_schema() AND table_name = %s "
-        "AND constraint_name = %s ORDER BY ordinal_position"
-    ),
-}
+
+
+def _legacy_specs():
+    return tuple(
+        ForeignKeySpec(
+            name=name,
+            table=table,
+            columns=(column, "farm_id"),
+            target_table=target,
+            target_columns=("id", "farm_id"),
+        )
+        for name, table, column, target in COMPOSITE_FKS
+    )
 
 
 def expected_definition(vendor: str, column: str, target: str) -> list:
     """Definición esperada de la FK, en el formato de ``fk_definition``."""
+    spec = ForeignKeySpec(
+        name="",
+        table="",
+        columns=(column, "farm_id"),
+        target_table=target,
+        target_columns=("id", "farm_id"),
+    )
+    rows = _expected_definition(spec)
     if vendor == "mysql":
-        return [(column, target, "id"), ("farm_id", target, "farm_id")]
-    return [(column,), ("farm_id",)]
+        return [row[:3] for row in rows]
+    return [(row[0],) for row in rows]
 
 
 def fk_definition(connection, table: str, name: str):
@@ -91,23 +98,26 @@ def fk_definition(connection, table: str, name: str):
     En MariaDB/MySQL incluye la tabla y la columna referenciadas de cada
     columna; en PostgreSQL, solo las columnas propias.
     """
-    vendor = connection.vendor
-    with connection.cursor() as cursor:
-        cursor.execute(FK_EXISTS_SQL[vendor], [table, name])
-        if not cursor.fetchone()[0]:
-            return None
-        cursor.execute(FK_COLUMNS_SQL[vendor], [table, name])
-        return [tuple(row) for row in cursor.fetchall()]
+    found = _fk_definition(connection, table, name)
+    if found is None:
+        return None
+    if connection.vendor == "mysql":
+        return [row[:3] for row in found]
+    return [(row[0],) for row in found]
 
 
 def _state(connection, name, table, column, target) -> str:
     """``absent``, ``ours`` o ``foreign`` para la FK indicada."""
-    found = fk_definition(connection, table, name)
-    if found is None:
-        return "absent"
-    if found == expected_definition(connection.vendor, column, target):
-        return "ours"
-    return "foreign"
+    spec = ForeignKeySpec(
+        name=name,
+        table=table,
+        columns=(column, "farm_id"),
+        target_table=target,
+        target_columns=("id", "farm_id"),
+    )
+    from apps.iot.migrations._composite_fk import _state as generic_state
+
+    return generic_state(connection, spec)
 
 
 def _refuse(name: str, table: str):
@@ -119,39 +129,12 @@ def _refuse(name: str, table: str):
 
 def add_composite_fks(apps, schema_editor):
     """Crea las FK compuestas que falten, en orden."""
-    connection = schema_editor.connection
-    if connection.vendor not in SUPPORTED_VENDORS:
-        return
-    quote = schema_editor.quote_name
-    for name, table, column, target in COMPOSITE_FKS:
-        state = _state(connection, name, table, column, target)
-        if state == "ours":
-            continue
-        if state == "foreign":
-            _refuse(name, table)
-        schema_editor.execute(
-            f"ALTER TABLE {quote(table)} ADD CONSTRAINT {quote(name)} "
-            f"FOREIGN KEY ({quote(column)}, {quote('farm_id')}) "
-            f"REFERENCES {quote(target)} ({quote('id')}, {quote('farm_id')}) "
-            "ON UPDATE RESTRICT ON DELETE RESTRICT"
-        )
+    add_foreign_keys(apps, schema_editor, _legacy_specs(), migration="iot.0002")
 
 
 def drop_composite_fks(apps, schema_editor):
     """Elimina en orden inverso solo las FK propias que existan."""
-    connection = schema_editor.connection
-    vendor = connection.vendor
-    if vendor not in SUPPORTED_VENDORS:
-        return
-    quote = schema_editor.quote_name
-    drop = "DROP FOREIGN KEY" if vendor == "mysql" else "DROP CONSTRAINT"
-    for name, table, column, target in reversed(COMPOSITE_FKS):
-        state = _state(connection, name, table, column, target)
-        if state == "absent":
-            continue
-        if state == "foreign":
-            _refuse(name, table)
-        schema_editor.execute(f"ALTER TABLE {quote(table)} {drop} {quote(name)}")
+    drop_foreign_keys(apps, schema_editor, _legacy_specs(), migration="iot.0002")
 
 
 class Migration(migrations.Migration):
