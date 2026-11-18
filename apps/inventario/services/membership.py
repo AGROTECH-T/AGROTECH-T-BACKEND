@@ -12,8 +12,15 @@ from apps.farms.capabilities import INVENTORY_WRITE_ROLES
 WRITE_ROLES = INVENTORY_WRITE_ROLES
 
 
-def require_membership(*, user: User, farm_id: int):
-    """Exige membresía en una finca activa para operaciones de lectura."""
+def require_membership(*, user: User, farm_id: int, lock: bool = False):
+    """Exige membresía en una finca activa.
+
+    Con ``lock=True`` (dentro de ``transaction.atomic()``) bloquea ``Farm`` y la
+    membresía, de modo que una desactivación concurrente no pueda confirmarse
+    entre la comprobación y la escritura de inventario (INT-02).
+    """
+    if lock:
+        return farm_services.lock_active_membership(user=user, farm_id=farm_id)
     return farm_services.require_active_membership(user=user, farm_id=farm_id)
 
 

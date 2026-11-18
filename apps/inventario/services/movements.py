@@ -58,6 +58,10 @@ def register_movement(
             return existing
 
     with transaction.atomic():
+        # INT-02: revalida finca y membresía con bloqueo (Farm → membresía →
+        # producto) para que una desactivación concurrente no deje pasar el
+        # movimiento.
+        require_membership(user=user, farm_id=farm_id, lock=True)
         product = (
             Product.objects.select_for_update()
             .select_related("unit", "unit__base_unit")

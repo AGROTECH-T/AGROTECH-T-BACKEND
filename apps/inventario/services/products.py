@@ -6,7 +6,7 @@ Contexto: categoría y unidad salen del catálogo; la cantidad solo cambia por m
 """
 from decimal import Decimal
 
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import (
     DecimalField,
     F,
@@ -116,8 +116,30 @@ def create_product(
     min_stock: Decimal = ZERO,
 ) -> Product:
     """Crea un insumo con catálogo del sistema o unidades custom activas."""
-    membership = require_membership(user=user, farm_id=farm_id)
-    require_action(membership, WRITE_STOCK)
+    with transaction.atomic():
+        # INT-02: bloquea la finca para que no se desactive a mitad de la creación.
+        membership = require_membership(user=user, farm_id=farm_id, lock=True)
+        require_action(membership, WRITE_STOCK)
+        return _create_product_locked(
+            membership=membership,
+            name=name,
+            category_code=category_code,
+            unit_code=unit_code,
+            barcode=barcode,
+            min_stock=min_stock,
+        )
+
+
+def _create_product_locked(
+    *,
+    membership,
+    name: str,
+    category_code: str,
+    unit_code: str,
+    barcode: str,
+    min_stock: Decimal,
+) -> Product:
+    """Valida y crea el insumo con la finca ya bloqueada."""
     clean_name = _required_text(name, "el nombre del insumo es obligatorio", 100)
     clean_barcode = _optional_barcode(barcode)
     if min_stock < ZERO:
@@ -134,15 +156,16 @@ def create_product(
     _reject_duplicate_barcode(farm_id=membership.farm_id, barcode=clean_barcode)
 
     try:
-        return Product.objects.create(
-            farm=membership.farm,
-            name=clean_name,
-            barcode=clean_barcode,
-            category=category,
-            unit=unit,
-            min_stock=min_stock,
-            quantity=ZERO,
-        )
+        with transaction.atomic():
+            return Product.objects.create(
+                farm=membership.farm,
+                name=clean_name,
+                barcode=clean_barcode,
+                category=category,
+                unit=unit,
+                min_stock=min_stock,
+                quantity=ZERO,
+            )
     except IntegrityError as exc:
         raise AppError("ese código de barras ya existe en la finca", 409) from exc
 
