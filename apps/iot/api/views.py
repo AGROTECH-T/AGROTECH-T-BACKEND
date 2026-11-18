@@ -251,6 +251,84 @@ class SensorSourceDetailView(APIView):
 
 
 @extend_schema(tags=["IoT"])
+class DeviceDeactivateView(APIView):
+    """Desactiva un gateway o un coordinador (baja lógica)."""
+
+    device_kind = "gateway"
+
+    @extend_schema(
+        request=SensorSourceDeactivateSerializer,
+        responses={200: GatewaySerializer},
+    )
+    def post(self, request: Request, farm_id: int, uid: str) -> Response:
+        denied = _authorize_manage(request=request, farm_id=farm_id)
+        if denied is not None:
+            return denied
+        serializer = SensorSourceDeactivateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            if self.device_kind == "coordinator":
+                device = services.deactivate_coordinator(
+                    user=request.user,
+                    farm_id=farm_id,
+                    uid=uid,
+                    **serializer.validated_data,
+                )
+                body = CoordinatorSerializer(device).data
+            else:
+                device = services.deactivate_gateway(
+                    user=request.user,
+                    farm_id=farm_id,
+                    uid=uid,
+                    **serializer.validated_data,
+                )
+                body = GatewaySerializer(device).data
+        except AppError as exc:
+            return _app_error_response(exc)
+        return Response(body)
+
+
+@extend_schema(tags=["IoT"])
+class GatewayDeactivateView(DeviceDeactivateView):
+    """Baja lógica de un gateway."""
+
+    device_kind = "gateway"
+
+
+@extend_schema(tags=["IoT"])
+class CoordinatorDeactivateView(DeviceDeactivateView):
+    """Baja lógica de un coordinador."""
+
+    device_kind = "coordinator"
+
+
+@extend_schema(tags=["IoT"])
+class SensorDeactivateView(APIView):
+    """Desactiva un sensor (baja lógica) y libera su canal."""
+
+    @extend_schema(
+        request=SensorSourceDeactivateSerializer,
+        responses={200: SensorSerializer},
+    )
+    def post(self, request: Request, farm_id: int, uid: str) -> Response:
+        denied = _authorize_manage(request=request, farm_id=farm_id)
+        if denied is not None:
+            return denied
+        serializer = SensorSourceDeactivateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            sensor = services.deactivate_sensor(
+                user=request.user,
+                farm_id=farm_id,
+                uid=uid,
+                **serializer.validated_data,
+            )
+        except AppError as exc:
+            return _app_error_response(exc)
+        return Response(SensorSerializer(sensor).data)
+
+
+@extend_schema(tags=["IoT"])
 class ReadingListView(APIView):
     """Lista las mediciones de una finca con filtros validados por el servicio."""
 

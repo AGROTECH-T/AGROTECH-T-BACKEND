@@ -7,10 +7,13 @@ from apps.iot.api.provisioning import (
     GatewayProvisioningView,
 )
 from apps.iot.api.views import (
+    CoordinatorDeactivateView,
     CoordinatorGatewayAuthorizationView,
     CoordinatorGatewayRevokeView,
+    GatewayDeactivateView,
     MeasurementCorrectionListCreateView,
     ReadingListView,
+    SensorDeactivateView,
     SensorListView,
     SensorSourceDetailView,
     SensorSourceListView,
@@ -19,9 +22,19 @@ from apps.iot.api.views import (
 urlpatterns = [
     path("farms/<int:farm_id>/gateways/", GatewayProvisioningView.as_view(), name="iot-gateways"),
     path(
+        "farms/<int:farm_id>/gateways/<str:uid>/deactivate/",
+        GatewayDeactivateView.as_view(),
+        name="iot-gateway-deactivate",
+    ),
+    path(
         "farms/<int:farm_id>/coordinators/",
         CoordinatorProvisioningView.as_view(),
         name="iot-coordinators",
+    ),
+    path(
+        "farms/<int:farm_id>/coordinators/<str:uid>/deactivate/",
+        CoordinatorDeactivateView.as_view(),
+        name="iot-coordinator-deactivate",
     ),
     path(
         "farms/<int:farm_id>/coordinators/<str:uid>/credentials/",
@@ -46,6 +59,11 @@ urlpatterns = [
         name="iot-gateway-credentials",
     ),
     path("farms/<int:farm_id>/sensors/", SensorListView.as_view(), name="iot-sensors"),
+    path(
+        "farms/<int:farm_id>/sensors/<str:uid>/deactivate/",
+        SensorDeactivateView.as_view(),
+        name="iot-sensor-deactivate",
+    ),
     path(
         "farms/<int:farm_id>/sensor-sources/",
         SensorSourceListView.as_view(),
