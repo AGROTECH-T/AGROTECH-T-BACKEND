@@ -11,5 +11,6 @@ jwcrypto>=1.5,<2
 argon2-cffi>=25,<26
 requests>=2.32,<3
 python-dotenv>=1.1,<2
+defusedxml>=0.7,<1
 gunicorn>=23,<24
 paho-mqtt>=2.1,<3

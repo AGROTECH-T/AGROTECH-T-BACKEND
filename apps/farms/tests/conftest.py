@@ -56,6 +56,8 @@ def make_user(db):
             can_create_farms=kwargs.pop("can_create_farms", True),
             # F10.2: crear fincas exige correo verificado en el servicio.
             email_verified=kwargs.pop("email_verified", True),
+            # INT-02: rol de plataforma solo si la prueba lo pide.
+            is_administrador=kwargs.pop("is_administrador", False),
             **kwargs,
         )
 

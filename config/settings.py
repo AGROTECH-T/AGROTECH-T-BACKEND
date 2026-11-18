@@ -19,6 +19,8 @@ from config.gateway_credential_key import resolve_gateway_credential_key
 from config.invitation_code_key import resolve_invitation_code_key
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "/media/"
 
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
@@ -46,10 +48,6 @@ INSTALLED_APPS = [
     "apps.farms",
     "apps.permissions",
     "apps.production.avicultura",
-    "apps.production.piscicultura",
-    "apps.production.porcicultura",
-    "apps.production.agricultura",
-    "apps.production.hidroponia",
     "apps.inventario",
     "apps.dashboard",
     "apps.alertas",

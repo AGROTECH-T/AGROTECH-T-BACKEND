@@ -4,6 +4,7 @@ Propósito: reexportar el catálogo y armar la respuesta de Configuración.
 Contexto: no persiste membresías ni valida fincas.
 """
 
+from apps.farms.permissions import PERMISOS_ASIGNABLES
 from apps.farms.role_actors import (
     ACTORES,
     ADMINISTRADOR,
@@ -32,6 +33,7 @@ __all__ = [
     "PENDIENTE",
     "PENDIENTES",
     "PERMISOS",
+    "PERMISOS_ASIGNABLES",
     "PERMITIDO",
     "REGLAS",
     "ROLES",
@@ -48,6 +50,7 @@ def catalogo() -> dict:
         "roles": ROLES,
         "actores": ACTORES,
         "permisos": PERMISOS,
+        "asignables": PERMISOS_ASIGNABLES,
         "reglas": REGLAS,
         "pendientes": PENDIENTES,
         "estados": ESTADOS,

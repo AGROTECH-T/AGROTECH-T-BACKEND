@@ -1,9 +1,7 @@
-"""Módulo avicultura (esqueleto, sin lógica).
+"""Módulo de galpón para pollos de engorde.
 
-Primer módulo productivo a desarrollar en una fase posterior
-(AVICULTURA / GALPÓN). En esta fase solo se crea el esqueleto.
-No debe modificar estructuras internas de otros dominios: comunicarse
-únicamente vía interfaces/servicios definidos.
+Sigue cada lote desde la preparación del galpón hasta el cierre.
+La postura queda fuera. Las cifras de una finca se configuran, no se imponen.
 """
 from django.apps import AppConfig
 

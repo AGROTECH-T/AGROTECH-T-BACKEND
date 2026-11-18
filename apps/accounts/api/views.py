@@ -30,11 +30,7 @@ from apps.accounts.api.throttles import (
     ResetIdentifierThrottle,
 )
 from apps.accounts.services import auth_service
-from apps.farms.capabilities import (
-    can_create_farms,
-    can_create_first_farm,
-    can_open_inactive_farms,
-)
+from apps.accounts.services.access import cuenta_publica
 from apps.trazabilidad.models import EventType
 from apps.trazabilidad.services import record_audit_event
 
@@ -141,7 +137,7 @@ class MeView(APIView):
     @extend_schema(responses={200: AccountResponseSerializer})
     def get(self, request: Request) -> Response:
         """Retorna los datos visibles del usuario actual."""
-        return Response(_account_payload(request.user))
+        return Response(cuenta_publica(request.user))
 
     @extend_schema(request=ProfileUpdateSerializer, responses={200: AccountResponseSerializer})
     def patch(self, request: Request) -> Response:
@@ -149,7 +145,7 @@ class MeView(APIView):
         serializer = ProfileUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         user = auth_service.update_profile(request.user, serializer.validated_data)
-        return Response(_account_payload(user))
+        return Response(cuenta_publica(user))
 
 
 class LogoutView(APIView):
@@ -202,23 +198,6 @@ class EmailVerificationConfirmView(APIView):
         serializer.is_valid(raise_exception=True)
         auth_service.verify_email(request.user, serializer.validated_data["code"])
         return Response({"ok": True})
-
-
-def _account_payload(user) -> dict:
-    """Arma los datos públicos de una cuenta autenticada."""
-    return {
-        "id": user.pk,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "identification": user.identification,
-        "phone": user.phone,
-        "correo": user.correo,
-        "is_active": user.is_active,
-        "email_verified": user.email_verified,
-        "can_create_farms": can_create_farms(user),
-        "can_create_first_farm": can_create_first_farm(user),
-        "can_open_inactive_farms": can_open_inactive_farms(user),
-    }
 
 
 def _token_response(token: str) -> Response:

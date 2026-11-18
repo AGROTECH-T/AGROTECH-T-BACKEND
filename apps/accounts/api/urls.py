@@ -7,6 +7,11 @@ from django.urls import path
 
 from apps.accounts.api.confirm_view import ConfirmCodeView
 from apps.accounts.api.csrf_view import CSRFTokenView
+from apps.accounts.api.platform_views import (
+    AdministradoresView,
+    PromoverAdministradorView,
+    QuitarAdministradorView,
+)
 from apps.accounts.api.views import (
     EmailVerificationConfirmView,
     EmailVerificationRequestView,
@@ -40,5 +45,20 @@ urlpatterns = [
         "auth/email/verification/confirm/",
         EmailVerificationConfirmView.as_view(),
         name="email-verification-confirm",
+    ),
+    path(
+        "configuracion/administradores/",
+        AdministradoresView.as_view(),
+        name="configuracion-administradores",
+    ),
+    path(
+        "configuracion/administradores/<int:user_id>/promover/",
+        PromoverAdministradorView.as_view(),
+        name="configuracion-promover-administrador",
+    ),
+    path(
+        "configuracion/administradores/<int:user_id>/quitar/",
+        QuitarAdministradorView.as_view(),
+        name="configuracion-quitar-administrador",
     ),
 ]

@@ -8,10 +8,12 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventario.api.movements.query import optional_date
 from apps.inventario.api.movements.serializers import (
     MovementCreateSerializer,
     MovementResponseSerializer,
 )
+from apps.inventario.api.paging import page_body, paginate
 from apps.inventario.services import movements as movement_services
 
 
@@ -28,7 +30,15 @@ class MovementListCreateView(APIView):
             farm_id=farm_id,
             product_id=product_id,
         )
-        return Response(MovementResponseSerializer(movements, many=True).data)
+        page, page_size, total, items = paginate(movements, request)
+        return Response(
+            page_body(
+                MovementResponseSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
+        )
 
     @extend_schema(
         tags=["inventario"],
@@ -47,4 +57,30 @@ class MovementListCreateView(APIView):
         return Response(
             MovementResponseSerializer(movement).data,
             status=status.HTTP_201_CREATED,
+        )
+
+
+class FarmMovementListView(APIView):
+    """Historial de movimientos de toda la finca."""
+
+    @extend_schema(
+        tags=["inventario"],
+        responses={200: MovementResponseSerializer(many=True)},
+    )
+    def get(self, request: Request, farm_id: int) -> Response:
+        movements = movement_services.list_farm_movements(
+            user=request.user,
+            farm_id=farm_id,
+            kind=request.query_params.get("kind") or None,
+            date_from=optional_date(request.query_params.get("from"), "la fecha inicial"),
+            date_to=optional_date(request.query_params.get("to"), "la fecha final"),
+        )
+        page, page_size, total, items = paginate(movements, request)
+        return Response(
+            page_body(
+                MovementResponseSerializer(items, many=True).data,
+                count=total,
+                page=page,
+                page_size=page_size,
+            )
         )

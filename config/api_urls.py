@@ -18,4 +18,6 @@ urlpatterns = [
     path("v1/", include("apps.farms.api.urls")),
     path("v1/", include("apps.inventario.api.urls")),
     path("v1/iot/", include("apps.iot.api.urls")),
+    path("v1/", include("apps.production.avicultura.api.urls")),
+    path("v1/", include("apps.alertas.api.urls")),
 ]

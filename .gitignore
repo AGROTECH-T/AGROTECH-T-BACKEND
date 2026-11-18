@@ -39,9 +39,14 @@ htmlcov/
 Thumbs.db
 desktop.ini
 
-# Guía de diseño local (skill agrotech-t; no versionar)
-.cursor/diseno-agrotech-t.md
-.cursor/skills/
+# Reglas, skills y diagramas: solo en la máquina, no son código
+.cursor/
+.opencode/
+AGENTS.md
+diagramas/
+
+# Túnel local de Cloudflare
+docker-compose.tunnel.yml
 
 
 # GitHub

@@ -11,8 +11,7 @@ independientes.
 
 - Monolito modular Django (un solo despliegue, una sola base de datos).
 - Organización por dominios funcionales en `apps/`.
-- El subdominio productivo se agrupa en `apps/production/`:
-  avicultura, piscicultura, porcicultura, agricultura, hidroponia.
+- El subdominio productivo se agrupa en `apps/production/`: hoy solo avicultura.
 
 No hay microservicios en esta etapa. No hay múltiples bases de datos.
 
@@ -31,10 +30,6 @@ No hay microservicios en esta etapa. No hay múltiples bases de datos.
 | farms | `apps/farms/` | Fincas, membresías y roles implementados; autorización estructural por rol |
 | permissions | `apps/permissions/` | Catálogo y motor de permisos operativos (motor implementado; integración parcial) |
 | avicultura | `apps/production/avicultura/` | Primer módulo productivo (fase posterior: galpón) |
-| piscicultura | `apps/production/piscicultura/` | Reservado |
-| porcicultura | `apps/production/porcicultura/` | Reservado |
-| agricultura | `apps/production/agricultura/` | Reservado |
-| hidroponia | `apps/production/hidroponia/` | Reservado |
 | inventario | `apps/inventario/` | Inventario (responsable: Cristian) |
 | dashboard | `apps/dashboard/` | Indicadores y visualización agregada |
 | alertas | `apps/alertas/` | Sistema de alertas |
