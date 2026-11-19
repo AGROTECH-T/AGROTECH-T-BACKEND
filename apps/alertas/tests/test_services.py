@@ -59,3 +59,29 @@ def test_sin_finca_no_hay_avisos(make_user):
     """Quien no pertenece a ninguna finca no ve avisos."""
     stranger = make_user(identification="99887766")
     assert alert_services.list_alerts(user=stranger) == []
+
+
+@pytest.mark.django_db
+def test_aviso_bitacora_si_lote_abierto_sin_ronda_hoy(user):
+    """Un lote abierto sin ronda del día pide llenar la bitácora."""
+    from django.utils import timezone
+
+    from apps.production.avicultura.services import houses as house_services
+    from apps.production.avicultura.services import lots as lot_services
+
+    farm_id = create_farm(user=user, name="El Roble").farm_id
+    house = house_services.create_house(user=user, farm_id=farm_id, name="Norte")
+    lot_services.open_lot(
+        user=user,
+        farm_id=farm_id,
+        house_id=house.id,
+        code="L-HOY",
+        arrived_at=timezone.now(),
+        received=80,
+        receiver_name="Ana Pérez",
+    )
+    items = alert_services.list_alerts(user=user)
+    bitacora = [item for item in items if item["kind"] == "bitacora"]
+    assert len(bitacora) == 1
+    assert bitacora[0]["lot"] == "L-HOY"
+    assert "ronda" in bitacora[0]["detail"].lower()
