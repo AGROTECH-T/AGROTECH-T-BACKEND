@@ -4,6 +4,7 @@
 """
 
 import hashlib
+import ipaddress
 
 from rest_framework.throttling import SimpleRateThrottle
 
@@ -47,10 +48,11 @@ class ResetIdentifierThrottle(IdentifierThrottle):
 
 
 class OriginIpThrottle(SimpleRateThrottle):
-    """Cuota por IP de origen, nunca por cuenta.
+    """Cuota por IP del cliente, nunca por cuenta.
 
-    Usa ``REMOTE_ADDR``. No lee ``X-Forwarded-For``, para que el cliente no
-    elija otra identidad cambiando esa cabecera.
+    En Render la toma de ``CF-Connecting-IP``, que Cloudflare escribe y el
+    cliente no puede falsificar. Sin esa cabecera usa ``REMOTE_ADDR``.
+    No lee ``X-Forwarded-For``.
     """
 
     scope_attr = "throttle_scope"
@@ -59,11 +61,11 @@ class OriginIpThrottle(SimpleRateThrottle):
         """El alcance lo define la vista, así que la cuota se calcula después."""
 
     def get_cache_key(self, request, view):
-        """Huella de la IP de la conexión, atada al alcance de la vista."""
-        remote_addr = request.META.get("REMOTE_ADDR")
-        if not remote_addr:
+        """Huella de la IP del cliente, atada al alcance de la vista."""
+        client_ip = _client_ip(request)
+        if not client_ip:
             return None
-        digest = hashlib.sha256(str(remote_addr).encode()).hexdigest()
+        digest = hashlib.sha256(client_ip.encode()).hexdigest()
         return self.cache_format % {"scope": self.scope, "ident": digest}
 
     def allow_request(self, request, view):
@@ -74,3 +76,17 @@ class OriginIpThrottle(SimpleRateThrottle):
         self.rate = self.get_rate()
         self.num_requests, self.duration = self.parse_rate(self.rate)
         return super().allow_request(request, view)
+
+
+def _client_ip(request) -> str | None:
+    """IP del cliente: la de Cloudflare si viene, si no la de la conexión."""
+    reported = str(request.META.get("HTTP_CF_CONNECTING_IP", "")).strip()
+    if reported:
+        try:
+            return str(ipaddress.ip_address(reported))
+        except ValueError:
+            reported = ""
+    remote_addr = request.META.get("REMOTE_ADDR")
+    if not remote_addr:
+        return None
+    return str(remote_addr)

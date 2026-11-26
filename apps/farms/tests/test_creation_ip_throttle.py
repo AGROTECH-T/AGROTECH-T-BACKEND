@@ -71,6 +71,27 @@ def test_same_ip_shares_the_bucket_across_accounts(rf, settings):
     assert ask("10.8.0.2", 2) is True
 
 
+def test_cloudflare_ip_beats_the_proxy_address(rf, settings):
+    """En Render la cuota sigue CF-Connecting-IP, no la IP del proxy."""
+    _rates(settings, register="1/hour")
+    view = SimpleNamespace(throttle_scope="register")
+
+    def ask(client_ip, account):
+        django_request = rf.post(
+            REGISTER,
+            REMOTE_ADDR="10.21.0.4",
+            HTTP_X_FORWARDED_FOR="203.0.113.9",
+            HTTP_CF_CONNECTING_IP=client_ip,
+        )
+        request = Request(django_request)
+        request.user = SimpleNamespace(is_authenticated=True, pk=account)
+        return OriginIpThrottle().allow_request(request, view)
+
+    assert ask("190.1.2.3", 1) is True
+    assert ask("190.1.2.3", 8) is False
+    assert ask("190.9.9.9", 8) is True
+
+
 @pytest.mark.django_db
 def test_register_lock_follows_the_ip(client, settings):
     """Otra identificación o una cabecera reenviada no abre una cuota nueva."""
