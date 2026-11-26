@@ -12,9 +12,9 @@ from apps.inventario.catalog import plain_amount
 class ProductCreateSerializer(serializers.Serializer):
     """Cuerpo para crear un insumo en la finca."""
 
-    name = serializers.CharField(max_length=100, allow_blank=False)
+    name = serializers.CharField(max_length=50, allow_blank=False)
     barcode = serializers.CharField(
-        max_length=64,
+        max_length=25,
         required=False,
         allow_blank=True,
         default="",
@@ -37,8 +37,8 @@ class ProductCreateSerializer(serializers.Serializer):
 class ProductUpdateSerializer(serializers.Serializer):
     """Cuerpo parcial para editar un insumo."""
 
-    name = serializers.CharField(max_length=100, required=False)
-    barcode = serializers.CharField(max_length=64, required=False, allow_blank=True)
+    name = serializers.CharField(max_length=50, required=False)
+    barcode = serializers.CharField(max_length=25, required=False, allow_blank=True)
     unit = serializers.CharField(max_length=40, required=False)
     category = serializers.CharField(max_length=40, required=False)
     min_stock = serializers.DecimalField(

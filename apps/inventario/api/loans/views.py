@@ -34,7 +34,7 @@ class LoanSerializer(serializers.Serializer):
 class LoanCreateSerializer(serializers.Serializer):
     """Datos de quien recibe el producto."""
 
-    borrower_name = serializers.CharField(max_length=120)
+    borrower_name = serializers.CharField(max_length=50)
     document_number = serializers.CharField(max_length=32)
     quantity = serializers.DecimalField(max_digits=12, decimal_places=3)
 

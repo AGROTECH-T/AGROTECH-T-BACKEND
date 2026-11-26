@@ -140,7 +140,7 @@ def _create_product_locked(
     min_stock: Decimal,
 ) -> Product:
     """Valida y crea el insumo con la finca ya bloqueada."""
-    clean_name = _required_text(name, "el nombre del insumo es obligatorio", 100)
+    clean_name = _required_text(name, "el nombre del insumo es obligatorio", 50)
     clean_barcode = _optional_barcode(barcode)
     if min_stock < ZERO:
         raise AppError("el stock mínimo no puede ser negativo", 400)
@@ -193,7 +193,11 @@ def update_product(
         raise AppError("insumo no encontrado", 404)
 
     if name is not None:
-        product.name = _required_text(name, "el nombre del insumo es obligatorio", 100)
+        product.name = _required_text(
+            name,
+            "el nombre del insumo es obligatorio",
+            50,
+        )
     if barcode is not None:
         product.barcode = _optional_barcode(barcode)
     if min_stock is not None:
@@ -298,8 +302,8 @@ def _reject_duplicate_barcode(
 
 def _optional_barcode(value: str) -> str:
     cleaned = value.strip()
-    if len(cleaned) > 64:
-        raise AppError("el código de barras no puede superar los 64 caracteres", 400)
+    if len(cleaned) > 25:
+        raise AppError("el código de barras no puede superar los 25 caracteres", 400)
     return cleaned
 
 

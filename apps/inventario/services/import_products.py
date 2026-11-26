@@ -165,7 +165,7 @@ def _cell(row: list[str], index: int) -> str:
 
 def _apply_row(*, user: User, membership, values: dict[str, str]) -> dict:
     """Crea o actualiza un producto con su stock."""
-    clean_name = _text(values["name"], "el producto no tiene nombre", 100)
+    clean_name = _text(values["name"], "el producto no tiene nombre", 50)
     clean_barcode = _barcode(values["barcode"])
     clean_category = _text(values["category"], "el producto no tiene categoría", 80)
     clean_unit = _text(values["unit"], "el producto no tiene unidad", 80)
@@ -408,8 +408,8 @@ def _amount(value: str, label: str) -> Decimal:
 def _barcode(value: str) -> str:
     """Código opcional, único en la finca y de 64 caracteres como máximo."""
     clean = value.strip()
-    if len(clean) > 64:
-        raise AppError("el código no puede superar los 64 caracteres")
+    if len(clean) > 25:
+        raise AppError("el código no puede superar los 25 caracteres")
     return clean
 
 

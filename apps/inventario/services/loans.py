@@ -53,7 +53,7 @@ def lend_product(
     quantity: Decimal,
 ) -> tuple[ProductLoan, Product]:
     """Registra el préstamo y descuenta la cantidad del stock."""
-    name = _person(borrower_name, "escribe el nombre completo", 120)
+    name = _person(borrower_name, "escribe el nombre completo", 50)
     document = _document(document_number)
     with transaction.atomic():
         movement = register_movement(
