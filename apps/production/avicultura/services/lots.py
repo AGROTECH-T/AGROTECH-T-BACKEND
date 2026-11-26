@@ -81,14 +81,14 @@ def open_lot(*, user: User, farm_id: int, **data) -> Lot:
                 dead_on_arrival=dead,
                 discarded_on_arrival=discarded,
                 live_count=received - dead - discarded,
-                supplier=(data.get("supplier") or "").strip()[:120],
+                supplier=(data.get("supplier") or "").strip()[:25],
                 documents=(data.get("documents") or "").strip()[:200],
                 initial_age_days=int(data.get("initial_age_days") or 0),
                 initial_weight=data.get("initial_weight"),
                 stage=stage,
                 levante_on=data.get("levante_on"),
                 engorde_on=data.get("engorde_on"),
-                feed_type=(data.get("feed_type") or "").strip()[:80],
+                feed_type=(data.get("feed_type") or "").strip()[:25],
                 reception_notes=(data.get("reception_notes") or "").strip(),
                 receiver_name=_required(data.get("receiver_name"), "quién recibió el lote"),
                 created_by=user,
@@ -142,7 +142,7 @@ def update_lot(*, user: User, farm_id: int, lot_id: int, **data) -> Lot:
         arrived = data["arrived_at"]
         lot.arrived_at = timezone.make_aware(arrived) if timezone.is_naive(arrived) else arrived
     if data.get("supplier") is not None:
-        lot.supplier = data["supplier"].strip()[:120]
+        lot.supplier = data["supplier"].strip()[:25]
     if data.get("documents") is not None:
         lot.documents = data["documents"].strip()[:200]
     if data.get("initial_age_days") is not None:
@@ -158,7 +158,7 @@ def update_lot(*, user: User, farm_id: int, lot_id: int, **data) -> Lot:
     if "engorde_on" in data:
         lot.engorde_on = data["engorde_on"]
     if data.get("feed_type") is not None:
-        lot.feed_type = data["feed_type"].strip()[:80]
+        lot.feed_type = data["feed_type"].strip()[:25]
     if data.get("reception_notes") is not None:
         lot.reception_notes = data["reception_notes"].strip()
     if data.get("receiver_name") is not None:
@@ -423,14 +423,14 @@ def _code(value: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError("el código del lote es obligatorio", 400)
-    return clean[:40]
+    return clean[:25]
 
 
 def _required(value: str | None, label: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError(f"{label} es obligatorio", 400)
-    return clean[:80]
+    return clean[:25]
 
 
 def _date(value) -> str | None:

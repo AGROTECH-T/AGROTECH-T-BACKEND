@@ -33,7 +33,7 @@ def create_user_category(
     clean_name = name.strip()
     if not clean_name:
         raise AppError("escribe el nombre de la categoría", 400)
-    if len(clean_name) > 80:
+    if len(clean_name) > 25:
         raise AppError("el nombre de la categoría es demasiado largo", 400)
 
     with transaction.atomic():
@@ -67,7 +67,7 @@ def rename_category(
     clean_name = name.strip()
     if not clean_name:
         raise AppError("escribe el nombre de la categoría", 400)
-    if len(clean_name) > 80:
+    if len(clean_name) > 25:
         raise AppError("el nombre de la categoría es demasiado largo", 400)
     taken = InventoryCategory.objects.filter(name__iexact=clean_name).exclude(pk=category.pk)
     if taken.exists():

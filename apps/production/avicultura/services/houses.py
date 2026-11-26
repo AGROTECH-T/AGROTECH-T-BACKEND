@@ -170,7 +170,7 @@ def _name(value: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError("el nombre del galpón es obligatorio", 400)
-    return clean[:80]
+    return clean[:25]
 
 
 def _positive(value, label: str) -> Decimal:

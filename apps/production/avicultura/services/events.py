@@ -139,7 +139,7 @@ def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent
             created_by=user,
             observed_value=value,
             unit=(data.get("unit") or "")[:20],
-            place=(data.get("place") or "")[:80],
+            place=(data.get("place") or "")[:25],
             notes=notes,
             origin=_choice(data.get("origin"), EventOrigin.values, EventOrigin.MANUAL, "origen"),
             attention=_choice(
@@ -155,7 +155,7 @@ def register_event(*, user: User, farm_id: int, lot_id: int, **data) -> LotEvent
                 "estado",
             ),
             action=(data.get("action") or "")[:200],
-            assignee=(data.get("assignee") or "")[:80],
+            assignee=(data.get("assignee") or "")[:25],
             follow_up=data.get("follow_up"),
             estimated=bool(data.get("estimated")),
             confirmed=bool(data.get("confirmed")),
@@ -446,7 +446,7 @@ def _required(value: str | None, label: str) -> str:
     clean = (value or "").strip()
     if not clean:
         raise AppError(f"{label} es obligatorio", 400)
-    return clean[:80]
+    return clean[:25]
 
 
 def _choice(value, allowed, default, label: str) -> str:

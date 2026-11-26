@@ -16,12 +16,12 @@ from apps.accounts.validators import (
 class RegisterSerializer(serializers.Serializer):
     """Valida los datos requeridos para crear una cuenta."""
 
-    first_name = serializers.CharField(max_length=40)
-    last_name = serializers.CharField(max_length=40)
+    first_name = serializers.CharField(max_length=25)
+    last_name = serializers.CharField(max_length=25)
     identification = serializers.CharField(max_length=30)
     phone = serializers.CharField(max_length=30)
-    correo = serializers.EmailField()
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    correo = serializers.EmailField(max_length=25)
+    password = serializers.CharField(write_only=True, trim_whitespace=False, max_length=25)
 
     def validate(self, attrs: dict) -> dict:
         """Normaliza la cuenta y exige celular y correo."""
@@ -40,8 +40,8 @@ class ProfileUpdateSerializer(serializers.Serializer):
     El documento no se declara: la identificación nunca se modifica.
     """
 
-    first_name = serializers.CharField(max_length=40)
-    last_name = serializers.CharField(max_length=40)
+    first_name = serializers.CharField(max_length=25)
+    last_name = serializers.CharField(max_length=25)
     correo = serializers.EmailField()
     phone = serializers.CharField(max_length=30)
 
@@ -52,7 +52,13 @@ class ProfileUpdateSerializer(serializers.Serializer):
         if "last_name" in attrs:
             attrs["last_name"] = normalize_name(attrs["last_name"], "primer apellido")
         if "correo" in attrs:
-            attrs["correo"] = attrs["correo"].strip().lower()
+            correo = attrs["correo"].strip().lower()
+            actual = str(self.context.get("current_correo") or "").strip().lower()
+            if correo != actual and len(correo) > 25:
+                raise serializers.ValidationError(
+                    {"correo": "el correo no puede superar 25 caracteres"}
+                )
+            attrs["correo"] = correo
         if "phone" in attrs:
             attrs["phone"] = normalize_phone(attrs["phone"])
         return attrs
@@ -62,7 +68,7 @@ class LoginSerializer(serializers.Serializer):
     """Valida credenciales de inicio de sesión."""
 
     identification = serializers.CharField(max_length=30)
-    password = serializers.CharField(trim_whitespace=False, max_length=72)
+    password = serializers.CharField(trim_whitespace=False, max_length=25)
 
     def validate_identification(self, value: str) -> str:
         """Normaliza la identificación."""
@@ -102,7 +108,7 @@ class ResetSerializer(serializers.Serializer):
 
     identification = serializers.CharField(max_length=30)
     code = serializers.RegexField(r".*\d{6}.*", max_length=30)
-    password = serializers.CharField(trim_whitespace=False)
+    password = serializers.CharField(trim_whitespace=False, max_length=25)
 
     def validate_identification(self, value: str) -> str:
         """Normaliza la identificación."""
@@ -171,12 +177,12 @@ class ListaAdministradoresSerializer(serializers.Serializer):
 class CrearAdministradorSerializer(serializers.Serializer):
     """Datos para que el superadmin cree un administrador."""
 
-    first_name = serializers.CharField(max_length=40)
-    last_name = serializers.CharField(max_length=40)
+    first_name = serializers.CharField(max_length=25)
+    last_name = serializers.CharField(max_length=25)
     identification = serializers.CharField(max_length=30)
-    correo = serializers.EmailField()
+    correo = serializers.EmailField(max_length=25)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password = serializers.CharField(write_only=True, trim_whitespace=False, max_length=25)
 
     def validate(self, attrs: dict) -> dict:
         """Normaliza la cuenta y exige una contraseña fuerte."""

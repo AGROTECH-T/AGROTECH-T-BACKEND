@@ -42,7 +42,7 @@ def create_custom_unit(
     require_action(membership, CREATE_UNIT)
 
     clean_stem = _slug_stem(stem)
-    clean_label = _required_text(label, "el nombre visible de la unidad es obligatorio", 80)
+    clean_label = _required_text(label, "el nombre visible de la unidad es obligatorio", 25)
     if factor <= ZERO:
         raise AppError("el factor de conversión debe ser mayor que cero", 400)
     if not category_codes:
@@ -104,7 +104,7 @@ def create_base_unit(
     """Crea una medida base que el catálogo todavía no trae."""
     membership = require_membership(user=user, farm_id=farm_id)
     require_action(membership, CREATE_UNIT)
-    clean_name = _required_text(name, "escribe el nombre de la medida", 60)
+    clean_name = _required_text(name, "escribe el nombre de la medida", 25)
     clean_symbol = _symbol(symbol)
     code = _slug_stem(clean_name)[:20]
     if InventoryBaseUnit.objects.filter(code=code).exists():
@@ -138,7 +138,7 @@ def update_base_unit(
     membership = require_membership(user=user, farm_id=farm_id)
     require_action(membership, CREATE_UNIT)
     base = _base(code)
-    clean_name = _required_text(name, "escribe el nombre de la medida", 60)
+    clean_name = _required_text(name, "escribe el nombre de la medida", 25)
     clean_symbol = _symbol(symbol)
     if InventoryBaseUnit.objects.filter(symbol__iexact=clean_symbol).exclude(pk=base.pk).exists():
         raise AppError("ese símbolo ya está en una medida", 409)
@@ -183,7 +183,7 @@ def update_unit(
     membership = require_membership(user=user, farm_id=farm_id)
     require_action(membership, CREATE_UNIT)
     unit = _active_unit(code)
-    clean_label = _required_text(label, "el nombre visible de la unidad es obligatorio", 80)
+    clean_label = _required_text(label, "el nombre visible de la unidad es obligatorio", 25)
     if not category_codes:
         raise AppError("indica al menos una categoría para la unidad", 400)
     categories = list(InventoryCategory.objects.filter(code__in=category_codes, is_active=True))

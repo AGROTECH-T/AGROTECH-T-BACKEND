@@ -14,7 +14,7 @@ from apps.trazabilidad.services import AUDIT_REASON_MAX_LENGTH, REASON_TOO_LONG
 class FarmCreateSerializer(serializers.Serializer):
     """Valida el único dato editable al crear o actualizar una finca."""
 
-    name = serializers.CharField(max_length=100, allow_blank=False)
+    name = serializers.CharField(max_length=25, allow_blank=False)
 
     def to_internal_value(self, data):
         """Rechaza los campos que no pertenecen al contrato."""
@@ -173,7 +173,10 @@ class InvitationCreateSerializer(serializers.Serializer):
 
     def validate_email(self, value: str) -> str:
         """Normaliza el correo del destinatario."""
-        return value.strip().lower()
+        correo = value.strip().lower()
+        if len(correo) > 25:
+            raise serializers.ValidationError("el correo no puede superar 25 caracteres")
+        return correo
 
 
 class InvitationRoleSerializer(serializers.Serializer):

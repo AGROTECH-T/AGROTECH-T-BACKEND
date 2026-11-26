@@ -143,7 +143,11 @@ class MeView(APIView):
     @extend_schema(request=ProfileUpdateSerializer, responses={200: AccountResponseSerializer})
     def patch(self, request: Request) -> Response:
         """Actualiza el nombre, el correo y el celular del perfil."""
-        serializer = ProfileUpdateSerializer(data=request.data, partial=True)
+        serializer = ProfileUpdateSerializer(
+            data=request.data,
+            partial=True,
+            context={"current_correo": request.user.correo},
+        )
         serializer.is_valid(raise_exception=True)
         user = auth_service.update_profile(request.user, serializer.validated_data)
         return Response(cuenta_publica(user))
