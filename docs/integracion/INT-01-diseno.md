@@ -33,7 +33,6 @@ Principio: **una sola fuente de verdad por concepto**, sin dos sistemas que haga
 | Concepto | Decisión | Origen |
 |---|---|---|
 | Roles de plataforma `is_superadmin`, `is_administrador` | Se conservan | Cristian (`0003_platform_roles`) |
-| Usuarios sembrados al arrancar (`seed_usuarios`, superadmin) | Se conservan | Cristian |
 | Panel de administradores (`configuracion/administradores/…`) | Se conserva | Cristian |
 | Módulos visibles por cuenta (`modulos_visibles`) | Se conserva **y se agrega `IOT = "iot"`** a `MODULOS_COMPLETOS` (hoy: home, fincas, inventario, galpon, configuracion) | Cristian + ajuste |
 | Verificación de correo, `LoginCode` con propósito y entrega | Se conserva | Israel |
@@ -87,7 +86,7 @@ Leyenda: **I** = versión de Israel · **C** = versión de Cristian · **M** = m
 | `apps/inventario/tests/test_services.py` | Pruebas de finca inactiva | Pruebas de API, reglas y galpón | **M** |
 | `config/api_urls.py` | `v1/iot/` | `v1/` avicultura y alertas | **M**: las tres |
 | `.env.example` | Bloque IoT/MQTT | (sin cambios en ese bloque) | **I** |
-| `Dockerfile` | `CMD` solo gunicorn; migraciones aparte (IoT) | `CMD` con `migrate && seed_usuarios && gunicorn` y `/app/media` | **M**: se conserva `/app/media` y `seed_usuarios` de **C**; `migrate` **aparte** (ver E-3) |
+| `Dockerfile` | `CMD` solo gunicorn; migraciones aparte (IoT) | `CMD` con `migrate && gunicorn` y `/app/media` | **M**: se conserva `/app/media` de **C**; `migrate` **aparte** (ver E-3) |
 | `pyproject.toml` | Reglas ruff de `permissions` y `trazabilidad` | Reglas de `avicultura` | **M** (se quita la de `permissions` si se retira) |
 | `.github/workflows/ci.yml` | Modificado | **Borrado** el 11-nov ("quitar el chequeo automático") | **Pregunta F-2** |
 
@@ -145,7 +144,7 @@ Leyenda: **I** = versión de Israel · **C** = versión de Cristian · **M** = m
 
 ### Base de datos local de Israel
 Tiene aplicadas las migraciones con los **nombres viejos**. Recomendación: **recrearla** (es de desarrollo). Costo:
-- Volver a ejecutar `seed_usuarios` (usuarios de Cristian) o crear tu usuario y finca.
+- Crear tu usuario y finca.
 - **Volver a aprovisionar IoT** con `tools/iot/mvp_iot_provision.py`. Cambia el UID del gateway, así que hay que actualizar el ACL del token del gateway en Flespi, la línea `SET` del gateway (UID) y la del coordinador (clave nueva).
 - Repetir `SET GLOBAL log_bin_trust_function_creators=1` antes de migrar (triggers de `iot 0019`).
 
@@ -171,7 +170,7 @@ Si en el futuro hacen falta restricciones, se agregan **dentro** del nivel 3 de 
 ### Riesgos
 1. **`Session` de `OneToOne` a FK en producción**: cambia la clave primaria de la tabla `sessions`. Hay que probarlo sobre una copia del esquema de producción y aceptar que **las sesiones abiertas se cierren** (los usuarios vuelven a iniciar sesión).
 2. **Login de Cristian sobre sesiones múltiples**: confirmado. `apps/accounts/services/session_service.py:15` crea la sesión con `Session.objects.update_or_create(user=…)`, que trata la sesión como **una por usuario**; además las líneas 53 y `farms/asignacion.py:101` borran **todas** las sesiones del usuario. Hay que adaptar cada uso al modelo de sesiones múltiples; si no, el login puede fallar (`MultipleObjectsReturned`) o cerrar sesiones de otros dispositivos.
-3. **`migrate` dentro del `CMD` del Dockerfile**: con `iot 0019`, migrar exige el privilegio `TRIGGER` y, con binlog, `log_bin_trust_function_creators=1`. Si la BD de Render no lo permite, el contenedor **no arranca**. Propuesta: ejecutar `migrate` como paso separado del despliegue (pre-deploy command de Render) y dejar `seed_usuarios` y gunicorn en el `CMD`.
+3. **`migrate` dentro del `CMD` del Dockerfile**: con `iot 0019`, migrar exige el privilegio `TRIGGER` y, con binlog, `log_bin_trust_function_creators=1`. Si la BD de Render no lo permite, el contenedor **no arranca**. Propuesta: ejecutar `migrate` como paso separado del despliegue (pre-deploy command de Render) y dejar gunicorn en el `CMD`.
 4. **Retirar `apps/permissions`** cuando su tabla ya existe en alguna BD: solo afecta a BDs locales de Israel. No está en producción.
 5. **Finales de línea (CRLF/LF)**: se recomienda agregar `.gitattributes` (`* text=auto eol=lf`) **en un commit aparte**, antes de la mezcla, para no mezclar ruido con cambios reales.
 
@@ -195,7 +194,7 @@ Si en el futuro hacen falta restricciones, se agregan **dentro** del nivel 3 de 
 2. **CI**: lo quitaste el 11-nov. ¿Fue por fallos o por tiempo? ¿Lo reactivamos con la suite unificada?
 3. **`migrate` en el `CMD`**: ¿estás de acuerdo con moverlo a un paso previo del despliegue por el riesgo E-3?
 4. **Permisos**: ¿te parece bien que tu modelo (rol + `FarmPermission`) sea la fuente única y que se agreguen `ver_iot` / `gestionar_iot`?
-5. **Sesiones**: ¿alguna parte de tu código (login, `seed_usuarios`, panel de administradores) depende de que haya **una sola** sesión por usuario?
+5. **Sesiones**: ¿alguna parte de tu código (login, panel de administradores) depende de que haya **una sola** sesión por usuario?
 6. **Membresías**: tu `asignacion.py`, ¿puede filtrar por membresías activas (`status="active"`)?
 7. ¿Hay trabajo tuyo **sin subir** que también toque `accounts`, `farms` o la navegación?
 

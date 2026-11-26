@@ -83,6 +83,5 @@ La integración se hizo en una **copia aislada**. `feature/iot-mvp-funcional`, t
 1. **Pruebas con MariaDB** (fase 3): es donde pueden aparecer fallos de comportamiento entre las dos ramas.
 2. `iot 0022` pendiente (previo a la integración): revisar con la versión de Django de tu PC.
 3. `crear_persona` (Cristian): si la persona tuvo una membresía **revocada** en esa finca, crearla de nuevo choca con la restricción única. Habría que reactivar en vez de crear.
-4. Usuarios sembrados por `seed_usuarios`: si no son superadmin o administrador, necesitan correo verificado para crear fincas por la bandera.
-5. Retiro de `apps/permissions` (§2-1) y decisión sobre CI (§2-3).
-6. Ocultar botones de inventario según permisos (§2-4).
+4. Retiro de `apps/permissions` (§2-1) y decisión sobre CI (§2-3).
+5. Ocultar botones de inventario según permisos (§2-4).
