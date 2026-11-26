@@ -49,6 +49,7 @@ REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_THROTTLE_RATES": {
         "register": FIVE_REQUESTS_PER_HOUR,
+        "farm_create": "10/hour",
         "login": "10/minute",
         "login_account": "5/minute",
         "recovery": "30/minute",

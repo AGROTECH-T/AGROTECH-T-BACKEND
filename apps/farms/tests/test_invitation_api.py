@@ -16,6 +16,7 @@ pytestmark = pytest.mark.django_db
 def test_invitation_throttle_scopes_configured():
     rates = settings.REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"]
     assert rates["invitation_create"] == "30/hour"
+    assert rates["farm_create"] == "10/hour"
     assert rates["invitation_resend"] == "10/hour"
     assert rates["invitation_accept"] == "10/hour"
     assert rates["verification_request"] == "5/hour"

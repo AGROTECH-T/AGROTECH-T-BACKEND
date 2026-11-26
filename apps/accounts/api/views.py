@@ -26,6 +26,7 @@ from apps.accounts.api.serializers import (
 )
 from apps.accounts.api.throttles import (
     LoginIdentifierThrottle,
+    OriginIpThrottle,
     RecoveryIdentifierThrottle,
     ResetIdentifierThrottle,
 )
@@ -40,7 +41,7 @@ class RegisterView(APIView):
 
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [OriginIpThrottle]
     throttle_scope = "register"
 
     @extend_schema(request=RegisterSerializer, responses={201: SuccessResponseSerializer})

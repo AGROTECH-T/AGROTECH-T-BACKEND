@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from apps.accounts.api.throttles import OriginIpThrottle
 from apps.accounts.errors import AppError
 from apps.farms import services
 from apps.farms.code_attempts import CodeAttemptGuard
@@ -64,6 +65,15 @@ class InvitationDeliveryErrorSerializer(serializers.Serializer):
 
 class FarmListCreateView(APIView):
     """Lista las fincas propias y permite crear una finca."""
+
+    throttle_classes = [OriginIpThrottle]
+    throttle_scope = "farm_create"
+
+    def get_throttles(self):
+        """Aplica la cuota por IP solo al alta de la finca."""
+        if self.request.method == "POST":
+            return super().get_throttles()
+        return []
 
     @extend_schema(
         tags=["farms"],
@@ -442,7 +452,7 @@ class FarmMemberHistoryView(APIView):
 class FarmInvitationListCreateView(APIView):
     """Lista y crea invitaciones de una finca (solo administrador)."""
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [OriginIpThrottle]
     throttle_scope = "invitation_create"
 
     def get_throttles(self):
