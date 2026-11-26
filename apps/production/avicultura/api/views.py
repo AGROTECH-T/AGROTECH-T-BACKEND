@@ -12,6 +12,8 @@ from apps.production.avicultura.services import events as event_services
 from apps.production.avicultura.services import houses as house_services
 from apps.production.avicultura.services import lots as lot_services
 
+OBSERVATION_MAX = 500
+
 
 class HouseWriteSerializer(serializers.Serializer):
     name = serializers.CharField()
@@ -61,7 +63,9 @@ class LotWriteSerializer(serializers.Serializer):
     levante_on = serializers.DateField(required=False, allow_null=True)
     engorde_on = serializers.DateField(required=False, allow_null=True)
     feed_type = serializers.CharField(required=False, allow_blank=True)
-    reception_notes = serializers.CharField(required=False, allow_blank=True)
+    reception_notes = serializers.CharField(
+        max_length=OBSERVATION_MAX, required=False, allow_blank=True
+    )
     receiver_name = serializers.CharField()
 
 
@@ -81,12 +85,16 @@ class LotPatchSerializer(serializers.Serializer):
     levante_on = serializers.DateField(required=False, allow_null=True)
     engorde_on = serializers.DateField(required=False, allow_null=True)
     feed_type = serializers.CharField(required=False, allow_blank=True)
-    reception_notes = serializers.CharField(required=False, allow_blank=True)
+    reception_notes = serializers.CharField(
+        max_length=OBSERVATION_MAX, required=False, allow_blank=True
+    )
     receiver_name = serializers.CharField(required=False, allow_blank=True)
 
 
 class CloseSerializer(serializers.Serializer):
-    note = serializers.CharField(required=False, allow_blank=True)
+    note = serializers.CharField(
+        max_length=OBSERVATION_MAX, required=False, allow_blank=True
+    )
 
 
 class EventWriteSerializer(serializers.Serializer):
@@ -101,7 +109,9 @@ class EventWriteSerializer(serializers.Serializer):
     )
     unit = serializers.CharField(required=False, allow_blank=True)
     place = serializers.CharField(required=False, allow_blank=True)
-    notes = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(
+        max_length=OBSERVATION_MAX, required=False, allow_blank=True
+    )
     origin = serializers.CharField(required=False, allow_blank=True)
     attention = serializers.CharField(required=False, allow_blank=True)
     state = serializers.CharField(required=False, allow_blank=True)
@@ -121,7 +131,9 @@ class CorrectionSerializer(serializers.Serializer):
         required=False,
         allow_null=True,
     )
-    notes = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(
+        max_length=OBSERVATION_MAX, required=False, allow_blank=True
+    )
     payload = serializers.DictField(required=False)
     estimated = serializers.BooleanField(required=False)
     confirmed = serializers.BooleanField(required=False)
