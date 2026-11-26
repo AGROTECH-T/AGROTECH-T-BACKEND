@@ -31,7 +31,7 @@ from apps.farms import services as farm_services
 from apps.farms.models import FarmMembership
 from apps.iot.db_guard import require_mariadb
 
-IOT_MANAGE_FORBIDDEN = "no tienes permiso para administrar dispositivos IoT"
+IOT_MANAGE_FORBIDDEN = "no tienes permiso para administrar Sensores"
 
 
 def require_read_membership(*, user: User, farm_id: int) -> FarmMembership:

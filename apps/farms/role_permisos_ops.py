@@ -112,8 +112,8 @@ PERMISOS_OPS = (
     },
     {
         "id": "ver_iot",
-        "nombre": "Consultar sensores y lecturas IoT",
-        "modulo": "IoT",
+        "nombre": "Consultar sensores y lecturas",
+        "modulo": "Sensores",
         "por_rol": {
             ADMINISTRADOR: {"estado": PERMITIDO, "detalle": "Dispositivos, sensores y mediciones."},
             OPERADOR: {"estado": PERMITIDO, "detalle": "Dispositivos, sensores y mediciones."},
@@ -122,8 +122,8 @@ PERMISOS_OPS = (
     },
     {
         "id": "gestionar_iot",
-        "nombre": "Registrar y administrar dispositivos IoT",
-        "modulo": "IoT",
+        "nombre": "Registrar y administrar dispositivos",
+        "modulo": "Sensores",
         "por_rol": {
             ADMINISTRADOR: {
                 "estado": PERMITIDO,

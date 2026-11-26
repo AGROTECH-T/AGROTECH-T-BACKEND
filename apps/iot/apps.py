@@ -9,4 +9,4 @@ class IotConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "apps.iot"
     label = "iot"
-    verbose_name = "IoT"
+    verbose_name = "Sensores"
