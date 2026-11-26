@@ -58,7 +58,7 @@ class LoginView(APIView):
 
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [ScopedRateThrottle, LoginIdentifierThrottle]
+    throttle_classes = [OriginIpThrottle, LoginIdentifierThrottle]
     throttle_scope = "login"
 
     @extend_schema(request=LoginSerializer, responses={200: LoginResponseSerializer})
@@ -86,7 +86,7 @@ class RecoverView(APIView):
 
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [ScopedRateThrottle, RecoveryIdentifierThrottle]
+    throttle_classes = [OriginIpThrottle, RecoveryIdentifierThrottle]
     throttle_scope = "recovery"
 
     @extend_schema(request=RecoverSerializer, responses={200: RecoveryResponseSerializer})
@@ -105,7 +105,7 @@ class ResetView(APIView):
 
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [ScopedRateThrottle, ResetIdentifierThrottle]
+    throttle_classes = [OriginIpThrottle, ResetIdentifierThrottle]
     throttle_scope = "reset"
 
     @extend_schema(request=ResetSerializer, responses={200: SuccessResponseSerializer})
@@ -122,7 +122,7 @@ class RenewView(APIView):
 
     authentication_classes = []
     permission_classes = []
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [OriginIpThrottle]
     throttle_scope = "renew"
 
     @extend_schema(request=None, responses={200: TokenResponseSerializer})
@@ -174,7 +174,7 @@ class LogoutView(APIView):
 class EmailVerificationRequestView(APIView):
     """Solicita un código de verificación de correo."""
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [OriginIpThrottle, ScopedRateThrottle]
     throttle_scope = "verification_request"
 
     @extend_schema(request=None, responses={200: RecoveryResponseSerializer})
@@ -189,7 +189,7 @@ class EmailVerificationRequestView(APIView):
 class EmailVerificationConfirmView(APIView):
     """Confirma el código de verificación de correo."""
 
-    throttle_classes = [ScopedRateThrottle]
+    throttle_classes = [OriginIpThrottle, ScopedRateThrottle]
     throttle_scope = "verification_confirm"
 
     @extend_schema(request=VerificationConfirmSerializer, responses={200: SuccessResponseSerializer})
