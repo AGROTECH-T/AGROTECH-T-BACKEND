@@ -21,6 +21,9 @@ from config.invitation_code_key import resolve_invitation_code_key
 BASE_DIR = Path(__file__).resolve().parent.parent
 MEDIA_ROOT = BASE_DIR / "media"
 MEDIA_URL = "/media/"
+CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "")
+CLOUDFLARE_R2_BUCKET = os.getenv("CLOUDFLARE_R2_BUCKET", "agrotech-productos")
 
 DEBUG = os.getenv("DJANGO_DEBUG", "false").lower() == "true"
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")

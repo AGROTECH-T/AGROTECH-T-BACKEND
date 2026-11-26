@@ -144,9 +144,15 @@ def test_borrar_producto(login, user, farm, product):
 
 
 @pytest.mark.django_db
-def test_foto_se_sube_se_ve_y_se_quita(login, user, farm, product, settings, tmp_path):
+def test_foto_se_sube_se_ve_y_se_quita(login, user, farm, product, monkeypatch):
     """La foto del insumo recorre subida, descarga y borrado."""
-    settings.MEDIA_ROOT = tmp_path
+    from apps.inventario.services.image_storage import MemoryImageStore
+
+    memory = MemoryImageStore()
+    monkeypatch.setattr(
+        "apps.inventario.api.products.image_view.configured_store",
+        lambda: memory,
+    )
     client = login(user)
     url = f"{_root(farm)}/products/{product.id}/image/"
 

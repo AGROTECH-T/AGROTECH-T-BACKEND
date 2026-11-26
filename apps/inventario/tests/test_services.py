@@ -668,12 +668,19 @@ def test_excel_de_inventario_es_un_libro():
 
 
 @pytest.mark.django_db
-def test_foto_se_guarda_y_se_quita(user):
+def test_foto_se_guarda_y_se_quita(user, monkeypatch):
     """La foto entra si pesa hasta 2 MB y se puede quitar."""
     from django.core.files.uploadedfile import SimpleUploadedFile
     from rest_framework.test import APIRequestFactory, force_authenticate
 
     from apps.inventario.api.products.image_view import ProductImageView
+    from apps.inventario.services.image_storage import MemoryImageStore
+
+    memory = MemoryImageStore()
+    monkeypatch.setattr(
+        "apps.inventario.api.products.image_view.configured_store",
+        lambda: memory,
+    )
 
     farm_id = create_farm(user=user, name="La Esperanza").farm_id
     product = services.create_product(

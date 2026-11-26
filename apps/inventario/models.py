@@ -136,7 +136,7 @@ class Product(models.Model):
     quantity = models.DecimalField(max_digits=12, decimal_places=3, default=0)
     is_active = models.BooleanField(default=True)
     is_removed = models.BooleanField(default=False)
-    image = models.FileField(upload_to="products", blank=True, default="")
+    image = models.CharField(max_length=64, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
