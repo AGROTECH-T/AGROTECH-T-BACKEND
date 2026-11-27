@@ -48,8 +48,9 @@ def test_without_url_keeps_mariadb(monkeypatch, tmp_path: Path):
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.setenv("DB_NAME", "agrotech_t")
     chosen = database(tmp_path)
-    assert chosen["ENGINE"] == "django.db.backends.mysql"
+    assert chosen["ENGINE"] == "config.mysql"
     assert chosen["OPTIONS"]["charset"] == "utf8mb4"
+    assert chosen["OPTIONS"]["connect_timeout"] == 30
 
 
 def _mariadb_env(monkeypatch):

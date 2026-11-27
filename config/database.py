@@ -43,7 +43,13 @@ def _mysql(engine: str) -> dict:
     # correct if each statement sees the latest committed data (under
     # REPEATABLE READ an earlier read would pin an older snapshot). It equals
     # Django's MySQL default, so the effective behaviour does not change.
-    options = {"charset": "utf8mb4", "isolation_level": "read committed"}
+    # La MariaDB gratis de Layerbase tarda unos 20 s en despertar y PyMySQL
+    # corta la conexión a los 10. Sin esta espera el primer uso devuelve 500.
+    options = {
+        "charset": "utf8mb4",
+        "isolation_level": "read committed",
+        "connect_timeout": 30,
+    }
     ssl_options = _mariadb_ssl_options()
     if ssl_options is not None:
         options["ssl"] = ssl_options
@@ -54,7 +60,7 @@ def _mysql(engine: str) -> dict:
         # enforce TLS.
         options["ssl"] = {}
     return {
-        "ENGINE": engine,
+        "ENGINE": "config.mysql",
         "NAME": os.getenv("DB_NAME", "agrotech_t"),
         "USER": os.getenv("DB_USER", "agrotech_user"),
         "PASSWORD": os.getenv("DB_PASSWORD", ""),
